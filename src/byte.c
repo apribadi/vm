@@ -1,17 +1,13 @@
 typedef unsigned char byte;
 
-STATIC_INLINE u8 pop_u8(byte ** p) {
-  u8 r = (u8) (*p)[0];
-  *p = *p + 1;
-  return r;
+STATIC_INLINE u8 get_u8(byte * p) {
+  return (u8) p[0];
 }
 
-STATIC_INLINE u16 pop_u16(byte ** p) {
-  u16 r =
-      (u16) (*p)[0]
-    | (u16) (*p)[1] << 8;
-  *p = *p + 2;
-  return r;
+STATIC_INLINE u16 get_u16(byte * p) {
+  return
+      (u16) p[0]
+    | (u16) p[1] << 8;
 }
 
 STATIC_INLINE u32 get_u32(byte * p) {
@@ -59,6 +55,18 @@ STATIC_INLINE void set_u64(byte * p, u64 x) {
   p[5] = x >> 8 * 5;
   p[6] = x >> 8 * 6;
   p[7] = x >> 8 * 7;
+}
+
+STATIC_INLINE u8 pop_u8(byte ** p) {
+  u8 r = get_u8(*p);
+  *p += 1;
+  return r;
+}
+
+STATIC_INLINE u16 pop_u16(byte ** p) {
+  u16 r = get_u16(*p);
+  *p += 2;
+  return r;
 }
 
 STATIC_INLINE u32 pop_u32(byte ** p) {
