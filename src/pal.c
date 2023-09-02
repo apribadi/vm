@@ -28,6 +28,10 @@ struct OpTable {
   OpImpl dispatch[256];
 };
 
+STATIC_INLINE u64 var_i64(byte ** ip, byte * sp) {
+  return get_u64(sp + pop_u16(ip));
+}
+
 STATIC_INLINE enum ThreadResult dispatch(
     byte * ip,
     byte * sp,
@@ -38,21 +42,11 @@ STATIC_INLINE enum ThreadResult dispatch(
   TAIL return tp->dispatch[opcode](ip, sp, vp, tp);
 }
 
-enum ThreadResult op_abort(
-  byte * ip,
-  byte * sp,
-  byte * vp,
-  struct OpTable * tp
-) {
+enum ThreadResult op_abort(byte * ip, byte * sp, byte * vp, struct OpTable * tp) {
   return THREAD_RESULT_ABORT;
 }
 
-enum ThreadResult op_nop(
-  byte * ip,
-  byte * sp,
-  byte * vp,
-  struct OpTable * tp
-) {
+enum ThreadResult op_nop(byte * ip, byte * sp, byte * vp, struct OpTable * tp) {
   TAIL return dispatch(ip, sp, vp, tp);
 }
 
@@ -68,8 +62,8 @@ enum ThreadResult op_y_const_i64(byte * ip, byte * sp, byte * vp, struct OpTable
 }
 
 enum ThreadResult op_z_i64_add(byte * ip, byte * sp, byte * vp, struct OpTable * tp) {
-  u64 x = get_u64(sp + pop_u16(&ip));
-  u64 y = get_u64(sp + pop_u16(&ip));
+  u64 x = var_i64(&ip, sp);
+  u64 y = var_i64(&ip, sp);
   u64 z = x + y;
   put_u64(&vp, z);
   TAIL return dispatch(ip, sp, vp, tp);
