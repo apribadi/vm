@@ -6,6 +6,7 @@ enum Op: u16 {
   OP_CALL_INDIRECT_TAIL,
   OP_CALL_TAIL,
   OP_ENTRY,
+  OP_EXIT,
   OP_GOTO,
   OP_LABEL,
   OP_NOP,
@@ -144,6 +145,7 @@ enum Op: u16 {
   OP_PRIM_I64_TO_I32_HI,
   OP_PRIM_I64_TO_I5,
   OP_PRIM_I64_TO_I6,
+  OP_COUNT,
 };
 
 enum Ty: u8 {

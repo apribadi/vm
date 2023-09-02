@@ -19,7 +19,8 @@ pal: src/*.c
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
 		-fno-rounding-math \
-		-pedantic
+		-pedantic \
+		-DNDEBUG
 
 pal-debug: src/*.c
 	clang -o pal-debug src/pal.c \

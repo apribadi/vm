@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -26,7 +27,7 @@ typedef enum ThreadResult (*OpImpl)(
 );
 
 struct OpTable {
-  OpImpl dispatch[256];
+  OpImpl dispatch[OP_COUNT];
 };
 
 STATIC_INLINE u64 var_i64(byte ** ip, byte * sp) {
@@ -56,6 +57,10 @@ enum ThreadResult op_goto(byte * ip, byte * sp, byte * vp, struct OpTable * tp) 
   TAIL return dispatch(ip, sp, vp, tp);
 }
 */
+
+enum ThreadResult op_exit(byte * ip, byte * sp, byte * vp, struct OpTable * tp) {
+  return THREAD_RESULT_OK;
+}
 
 enum ThreadResult op_nop(byte * ip, byte * sp, byte * vp, struct OpTable * tp) {
   TAIL return dispatch(ip, sp, vp, tp);
@@ -91,6 +96,7 @@ enum ThreadResult op_prim_i64_is_eq(byte * ip, byte * sp, byte * vp, struct OpTa
 static struct OpTable OP_TABLE = {
   .dispatch = {
     [OP_ABORT] = op_abort,
+    [OP_EXIT] = op_exit,
     [OP_NOP] = op_nop,
     [OP_SHOW_I64] = op_show_i64,
     [OP_CONST_I64] = op_const_i64,
@@ -106,11 +112,6 @@ enum ThreadResult interpret(byte * ip) {
 }
 
 int main(int argc, char ** argv) {
-  (void) argc;
-  (void) argv;
-
-  printf("Hello!\n");
-
   byte code[1024] = { 0 };
 
   byte * p = &code[0];
@@ -124,7 +125,7 @@ int main(int argc, char ** argv) {
   put_i16(&p, 8);
   put_i16(&p, OP_SHOW_I64);
   put_i16(&p, 16);
-  put_i16(&p, OP_ABORT);
+  put_i16(&p, OP_EXIT);
 
   /*
   for (byte * q = &code[0]; q != p; ++ q) {
@@ -136,6 +137,7 @@ int main(int argc, char ** argv) {
 
   switch (r) {
     case THREAD_RESULT_OK:
+      printf("exit ok\n");
       break;
     case THREAD_RESULT_ABORT:
       printf("aborting ...\n");
