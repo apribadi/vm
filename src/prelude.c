@@ -87,6 +87,20 @@ STATIC_INLINE void set_f64(void * p, f64 x) {
   memcpy(p, &x, 8);
 }
 
+STATIC_INLINE f32 get_le_f32(void * p) {
+  // TODO: maybe byteswap
+  f32 x;
+  memcpy(&x, p, 4);
+  return x;
+}
+
+STATIC_INLINE f64 get_le_f64(void * p) {
+  // TODO: maybe byteswap
+  f64 x;
+  memcpy(&x, p, 8);
+  return x;
+}
+
 STATIC_INLINE s16 get_le_s16(void * p) {
   // TODO: maybe byteswap
   s16 x;

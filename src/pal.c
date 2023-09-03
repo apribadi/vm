@@ -121,6 +121,16 @@ static enum ThreadResult op_show_i64(b64 * ip, b64 * sp, b64 * vp, struct OpTabl
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
+static enum ThreadResult op_const_f32(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
+  set_f32(vp ++, get_le_f32(&iw.w1));
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
+static enum ThreadResult op_const_f64(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
+  set_f64(vp ++, get_le_f64(ip ++));
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
 static enum ThreadResult op_const_i32(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
   set_u32(vp ++, get_le_u32(&iw.w1));
   TAIL return dispatch(ip, sp, vp, tp, iw);
@@ -185,13 +195,14 @@ static struct OpTable OP_TABLE = {
     // [OP_JUMP] = op_jump,
     [OP_NOP] = op_nop,
     [OP_SHOW_I64] = op_show_i64,
-    [OP_CONST_F32] = op_const_i32, // same as op_const_i32
-    [OP_CONST_F64] = op_const_i64, // same as op_const_i64
+    [OP_CONST_F32] = op_const_f32,
+    [OP_CONST_F64] = op_const_f64,
     [OP_CONST_I32] = op_const_i32,
     [OP_CONST_I64] = op_const_i64,
     [OP_PRIM_F32_ADD] = op_prim_f32_add,
     [OP_PRIM_F32_SQRT] = op_prim_f32_sqrt,
     [OP_PRIM_F64_ADD] = op_prim_f64_add,
+    [OP_PRIM_F64_SQRT] = op_prim_f64_sqrt,
     [OP_PRIM_I32_ADD] = op_prim_i32_add,
     [OP_PRIM_I64_ADD] = op_prim_i64_add,
   },
