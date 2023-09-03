@@ -40,24 +40,24 @@ STATIC_INLINE enum ThreadResult dispatch(
   TAIL return tp->dispatch[get_le_u16(&iw.h0)](ip, sp, vp, tp, iw);
 }
 
-STATIC_INLINE bool var_bool(b64 * sp, u16 ix) {
-  return get_u8(&sp[ix]);
+STATIC_INLINE bool var_bool(b64 * sp, b16 * ix) {
+  return get_u8(&sp[get_le_u16(ix)]);
 }
 
-STATIC_INLINE u32 var_i32(b64 * sp, u16 ix) {
-  return get_u32(&sp[ix]);
+STATIC_INLINE u32 var_i32(b64 * sp, b16 * ix) {
+  return get_u32(&sp[get_le_u16(ix)]);
 }
 
-STATIC_INLINE u64 var_i64(b64 * sp, u16 ix) {
-  return get_u64(&sp[ix]);
+STATIC_INLINE u64 var_i64(b64 * sp, b16 * ix) {
+  return get_u64(&sp[get_le_u16(ix)]);
 }
 
-STATIC_INLINE f32 var_f32(b64 * sp, u16 ix) {
-  return get_f32(&sp[ix]);
+STATIC_INLINE f32 var_f32(b64 * sp, b16 * ix) {
+  return get_f32(&sp[get_le_u16(ix)]);
 }
 
-STATIC_INLINE f64 var_f64(b64 * sp, u16 ix) {
-  return get_f64(&sp[ix]);
+STATIC_INLINE f64 var_f64(b64 * sp, b16 * ix) {
+  return get_f64(&sp[get_le_u16(ix)]);
 }
 
 static enum ThreadResult op_abort(b64 *, b64 *, b64 *, struct OpTable *, b64) {
@@ -65,7 +65,7 @@ static enum ThreadResult op_abort(b64 *, b64 *, b64 *, struct OpTable *, b64) {
 }
 
 static enum ThreadResult op_branch(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  bool p = var_bool(sp, get_le_u16(&iw.h1));
+  bool p = var_bool(sp, &iw.h1);
   s16 k = p ? get_le_s16(&iw.h2) : get_le_s16(&iw.h3);
 
   ip = ip - 1 + k;
@@ -116,7 +116,7 @@ static enum ThreadResult op_nop(b64 * ip, b64 * sp, b64 * vp, struct OpTable * t
 }
 
 static enum ThreadResult op_show_i64(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  u64 x = var_i64(sp, get_le_u16(&iw.h1));
+  u64 x = var_i64(sp, &iw.h1);
   printf("%" PRIi64 "\n", x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
@@ -142,46 +142,46 @@ static enum ThreadResult op_const_i64(b64 * ip, b64 * sp, b64 * vp, struct OpTab
 }
 
 static enum ThreadResult op_prim_f32_add(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  f32 x = var_f32(sp, get_le_u16(&iw.h1));
-  f32 y = var_f32(sp, get_le_u16(&iw.h2));
+  f32 x = var_f32(sp, &iw.h1);
+  f32 y = var_f32(sp, &iw.h2);
   f32 z = x + y;
   set_f32(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_prim_f32_sqrt(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  f32 x = var_f32(sp, get_le_u16(&iw.h1));
+  f32 x = var_f32(sp, &iw.h1);
   f32 y = sqrtf(x);
   set_f32(vp ++, y);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_prim_f64_add(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  f64 x = var_f64(sp, get_le_u16(&iw.h1));
-  f64 y = var_f64(sp, get_le_u16(&iw.h2));
+  f64 x = var_f64(sp, &iw.h1);
+  f64 y = var_f64(sp, &iw.h2);
   f64 z = x + y;
   set_f64(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_prim_f64_sqrt(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  f64 x = var_f64(sp, get_le_u16(&iw.h1));
+  f64 x = var_f64(sp, &iw.h1);
   f64 y = sqrt(x);
   set_f64(vp ++, y);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_prim_i32_add(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  u32 x = var_i32(sp, get_le_u16(&iw.h1));
-  u32 y = var_i32(sp, get_le_u16(&iw.h2));
+  u32 x = var_i32(sp, &iw.h1);
+  u32 y = var_i32(sp, &iw.h2);
   u32 z = x + y;
   set_u32(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_prim_i64_add(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  u64 x = var_i64(sp, get_le_u16(&iw.h1));
-  u64 y = var_i64(sp, get_le_u16(&iw.h2));
+  u64 x = var_i64(sp, &iw.h1);
+  u64 y = var_i64(sp, &iw.h2);
   u64 z = x + y;
   set_u64(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
