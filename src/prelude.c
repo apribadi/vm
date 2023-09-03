@@ -39,8 +39,6 @@ static_assert(sizeof(b16) == 2 && alignof(b16) == 2);
 static_assert(sizeof(b32) == 4 && alignof(b32) == 4);
 static_assert(sizeof(b64) == 8 && alignof(b64) == 8);
 
-
-
 ////////
 
 STATIC_INLINE f32 get_f32(void * p) {
