@@ -195,5 +195,5 @@ STATIC_INLINE u16 iw_b3(u64 iw) {
 }
 
 STATIC_INLINE u32 iw_c1(u64 iw) {
-  return (u16) (iw >> 32);
+  return (u32) (iw >> 32);
 }

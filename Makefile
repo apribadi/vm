@@ -17,6 +17,7 @@ pal: src/*.c
 		-Werror \
 		-Wextra \
 		-Wno-fixed-enum-extension \
+		-Wno-unused-function \
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
@@ -36,6 +37,7 @@ pal-debug: src/*.c
 		-Werror \
 		-Wextra \
 		-Wno-fixed-enum-extension \
+		-Wno-unused-function \
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
