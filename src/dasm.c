@@ -1,3 +1,4 @@
+/*
 static void disassemble(u64 * ip, u64 * stop) {
   printf("================ DISASSEMBLY ================\n");
   while (ip != stop) {
@@ -29,3 +30,4 @@ static void disassemble(u64 * ip, u64 * stop) {
   }
   printf("=============================================\n");
 }
+*/

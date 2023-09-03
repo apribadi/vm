@@ -16,7 +16,10 @@ pal: src/*.c
 		-Wdouble-promotion \
 		-Werror \
 		-Wextra \
+		-Wno-c++98-compat \
+		-Wno-constant-logical-operand \
 		-Wno-fixed-enum-extension \
+		-Wno-pre-c2x-compat \
 		-Wno-unused-function \
 		-ffp-contract=off \
 		-fno-math-errno \
@@ -36,7 +39,10 @@ pal-debug: src/*.c
 		-Wdouble-promotion \
 		-Werror \
 		-Wextra \
+		-Wno-c++98-compat \
+		-Wno-constant-logical-operand \
 		-Wno-fixed-enum-extension \
+		-Wno-pre-c2x-compat \
 		-Wno-unused-function \
 		-ffp-contract=off \
 		-fno-math-errno \

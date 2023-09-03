@@ -158,6 +158,32 @@ enum Ty: u8 {
   TY_V256,
 };
 
+STATIC_INLINE w64 iw_make_ohhh(enum Op t, u16 x, u16 y, u16 z) {
+  w16 h0 = le_u16_to_w16(t);
+  w16 h1 = le_u16_to_w16(x);
+  w16 h2 = le_u16_to_w16(y);
+  w16 h3 = le_u16_to_w16(z);
+  w64 iw;
+  memcpy((byte *) &iw + 0, &h0, 2);
+  memcpy((byte *) &iw + 2, &h1, 2);
+  memcpy((byte *) &iw + 4, &h2, 2);
+  memcpy((byte *) &iw + 6, &h3, 2);
+  return iw;
+}
+
+STATIC_INLINE w64 iw_make_o___(enum Op op) {
+  return iw_make_ohhh(op, 0, 0, 0);
+}
+
+STATIC_INLINE w64 iw_make_oh__(enum Op op, u16 x) {
+  return iw_make_ohhh(op, x, 0, 0);
+}
+
+STATIC_INLINE w64 iw_make_ohh_(enum Op op, u16 x, u16 y) {
+  return iw_make_ohhh(op, x, y, 0);
+}
+
+/*
 STATIC_INLINE u64 iw_make_obbb(enum Op op, u16 b1, u16 b2, u16 b3) {
   return
       (u64) ((u64) op      )
@@ -177,23 +203,4 @@ STATIC_INLINE u64 iw_make_ob__(enum Op op, u16 b1) {
 STATIC_INLINE u64 iw_make_obb_(enum Op op, u16 b1, u16 b2) {
   return iw_make_obbb(op, b1, b2, 0);
 }
-
-STATIC_INLINE u16 iw_b0(u64 iw) {
-  return (u16) iw;
-}
-
-STATIC_INLINE u16 iw_b1(u64 iw) {
-  return (u16) (iw >> 16);
-}
-
-STATIC_INLINE u16 iw_b2(u64 iw) {
-  return (u16) (iw >> 32);
-}
-
-STATIC_INLINE u16 iw_b3(u64 iw) {
-  return (u16) (iw >> 48);
-}
-
-STATIC_INLINE u32 iw_c1(u64 iw) {
-  return (u32) (iw >> 32);
-}
+*/
