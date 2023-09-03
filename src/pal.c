@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,6 +8,7 @@
 
 #include "prelude.c"
 #include "code.c"
+#include "dasm.c"
 
 enum ThreadResult: u8 {
   THREAD_RESULT_OK,
@@ -38,6 +40,10 @@ STATIC_INLINE enum ThreadResult dispatch(
 
   u64 iw = * ip ++;
   TAIL return tp->dispatch[iw_b0(iw)](ip, sp, vp, tp, iw);
+}
+
+STATIC_INLINE bool var_bool(u64 * sp, u16 ix) {
+  return (u8) sp[ix];
 }
 
 STATIC_INLINE u32 var_i32(u64 * sp, u16 ix) {
@@ -76,13 +82,27 @@ static enum ThreadResult op_exit(u64 * ip, u64 * sp, u64 * vp, struct OpTable * 
   return THREAD_RESULT_OK;
 }
 
+static enum ThreadResult op_branch(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
+  bool p = var_bool(sp, iw_b1(iw));
+  s16 k = p ? (s16) iw_b2(iw) : (s16) iw_b3(iw);
+
+  ip = ip - 1 + k;
+  iw = * ip ++;
+  vp = sp + iw_b2(iw);
+
+  assert(iw_b0(iw) == OP_LABEL);
+  assert(iw_b1(iw) == 0);
+
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
 static enum ThreadResult op_nop(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_show_i64(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
   u64 x = var_i64(sp, iw_b1(iw));
-  printf("%" PRId64 "\n", x);
+  printf("%" PRIi64 "\n", x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
@@ -112,11 +132,25 @@ static enum ThreadResult op_prim_f32_add(u64 * ip, u64 * sp, u64 * vp, struct Op
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
+static enum ThreadResult op_prim_f32_sqrt(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
+  f32 x = var_f32(sp, iw_b1(iw));
+  f32 y = sqrtf(x);
+  * vp ++ = bitcast_f32_to_u32(y);
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
 static enum ThreadResult op_prim_f64_add(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
   f64 x = var_f64(sp, iw_b1(iw));
   f64 y = var_f64(sp, iw_b2(iw));
   f64 z = x + y;
   * vp ++ = bitcast_f64_to_u64(z);
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
+static enum ThreadResult op_prim_f64_sqrt(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
+  f64 x = var_f64(sp, iw_b1(iw));
+  f64 y = sqrt(x);
+  * vp ++ = bitcast_f64_to_u64(y);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
@@ -139,6 +173,7 @@ static enum ThreadResult op_prim_i64_add(u64 * ip, u64 * sp, u64 * vp, struct Op
 static struct OpTable OP_TABLE = {
   .dispatch = {
     [OP_ABORT] = op_abort,
+    [OP_BRANCH] = op_branch,
     [OP_EXIT] = op_exit,
     [OP_NOP] = op_nop,
     [OP_SHOW_I64] = op_show_i64,
@@ -148,6 +183,7 @@ static struct OpTable OP_TABLE = {
     [OP_CONST_I64] = op_const_i64,
     [OP_CONST_V256] = op_const_v256,
     [OP_PRIM_F32_ADD] = op_prim_f32_add,
+    [OP_PRIM_F32_SQRT] = op_prim_f32_sqrt,
     [OP_PRIM_F64_ADD] = op_prim_f64_add,
     [OP_PRIM_I32_ADD] = op_prim_i32_add,
     [OP_PRIM_I64_ADD] = op_prim_i64_add,
@@ -171,10 +207,12 @@ int main(int argc, char ** argv) {
   * p ++ = iw_make_o___(OP_CONST_I64);
   * p ++ = 13;
   * p ++ = iw_make_o___(OP_CONST_I64);
-  * p ++ = 3;
+  * p ++ = (u64) -1;
   * p ++ = iw_make_obb_(OP_PRIM_I64_ADD, 0, 1);
   * p ++ = iw_make_ob__(OP_SHOW_I64, 2);
   * p ++ = iw_make_o___(OP_EXIT);
+
+  disassemble(code, p);
 
   enum ThreadResult r = interpret(&code[0]);
 
