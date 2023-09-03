@@ -19,7 +19,6 @@ enum Op: u16 {
   OP_CONST_I5,
   OP_CONST_I6,
   OP_CONST_I64,
-  OP_CONST_V128,
   OP_CONST_V256,
   OP_PRIM_BOOL_AND,
   OP_PRIM_BOOL_IS_EQ,
@@ -159,11 +158,7 @@ enum Ty: u8 {
   TY_V256,
 };
 
-enum Wo: u64 {
-  WO_ABORT = 0,
-};
-
-STATIC_INLINE enum Wo wo_make_ohhh(enum Op op, u16 h1, u16 h2, u16 h3) {
+STATIC_INLINE u64 wo_make_ohhh(enum Op op, u16 h1, u16 h2, u16 h3) {
   return
       (u64) ((u64) op      )
     | (u64) ((u64) h1 << 16)
@@ -171,34 +166,34 @@ STATIC_INLINE enum Wo wo_make_ohhh(enum Op op, u16 h1, u16 h2, u16 h3) {
     | (u64) ((u64) h2 << 48);
 }
 
-STATIC_INLINE enum Wo wo_make_o___(enum Op op) {
+STATIC_INLINE u64 wo_make_o___(enum Op op) {
   return wo_make_ohhh(op, 0, 0, 0);
 }
 
-STATIC_INLINE enum Wo wo_make_oh__(enum Op op, u16 h1) {
+STATIC_INLINE u64 wo_make_oh__(enum Op op, u16 h1) {
   return wo_make_ohhh(op, h1, 0, 0);
 }
 
-STATIC_INLINE enum Wo wo_make_ohh_(enum Op op, u16 h1, u16 h2) {
+STATIC_INLINE u64 wo_make_ohh_(enum Op op, u16 h1, u16 h2) {
   return wo_make_ohhh(op, h1, h2, 0);
 }
 
-STATIC_INLINE enum Op wo_op(enum Wo wo) {
+STATIC_INLINE u16 wo_h0(u64 wo) {
   return wo;
 }
 
-STATIC_INLINE u16 wo_h1(enum Wo wo) {
+STATIC_INLINE u16 wo_h1(u64 wo) {
   return wo >> 16;
 }
 
-STATIC_INLINE u16 wo_h2(enum Wo wo) {
+STATIC_INLINE u16 wo_h2(u64 wo) {
   return wo >> 32;
 }
 
-STATIC_INLINE u16 wo_h3(enum Wo wo) {
+STATIC_INLINE u16 wo_h3(u64 wo) {
   return wo >> 48;
 }
 
-STATIC_INLINE u32 wo_w1(enum Wo wo) {
+STATIC_INLINE u32 wo_w1(u64 wo) {
   return wo >> 32;
 }
