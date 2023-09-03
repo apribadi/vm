@@ -17,11 +17,13 @@ pal: src/*.c
 		-Werror \
 		-Wextra \
 		-Wno-fixed-enum-extension \
-		-Wstrict-prototypes \
+		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
-		-fno-rounding-math \
 		-pedantic \
+		-Weverything \
+		-Wno-declaration-after-statement \
+		-Wno-unsafe-buffer-usage \
 		-DNDEBUG
 
 pal-debug: src/*.c
@@ -34,10 +36,12 @@ pal-debug: src/*.c
 		-Werror \
 		-Wextra \
 		-Wno-fixed-enum-extension \
-		-Wstrict-prototypes \
+		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
-		-fno-rounding-math \
 		-pedantic \
+		-Weverything \
+		-Wno-declaration-after-statement \
+		-Wno-unsafe-buffer-usage \
 		-fsanitize=address \
 		-fsanitize=undefined
