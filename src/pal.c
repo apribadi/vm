@@ -18,11 +18,11 @@ enum ThreadResult: u8 {
 struct OpTable;
 
 typedef enum ThreadResult (* OpFun)(
-  w64 *,
+  b64 *,
   u64 *,
   u64 *,
   struct OpTable *,
-  w64
+  b64
 );
 
 struct OpTable {
@@ -30,63 +30,63 @@ struct OpTable {
 };
 
 STATIC_INLINE enum ThreadResult dispatch(
-    w64 * ip,
+    b64 * ip,
     u64 * sp,
     u64 * vp,
     struct OpTable * tp,
-    w64
+    b64
 ) {
-  w64 iw = * ip ++;
-  TAIL return tp->dispatch[le_u16(&iw.h0)](ip, sp, vp, tp, iw);
+  b64 iw = * ip ++;
+  TAIL return tp->dispatch[get_le_u16(&iw.h0)](ip, sp, vp, tp, iw);
 }
 
 STATIC_INLINE bool var_bool(u64 * sp, u16 ix) {
-  return (u8) sp[ix];
+  return get_u8(&sp[ix]);
 }
 
 STATIC_INLINE u32 var_i32(u64 * sp, u16 ix) {
-  return (u32) sp[ix];
+  return get_u32(&sp[ix]);
 }
 
 STATIC_INLINE u64 var_i64(u64 * sp, u16 ix) {
-  return sp[ix];
+  return get_u64(&sp[ix]);
 }
 
 STATIC_INLINE f32 var_f32(u64 * sp, u16 ix) {
-  return bitcast_u32_to_f32((u32) sp[ix]);
+  return get_f32(&sp[ix]);
 }
 
 STATIC_INLINE f64 var_f64(u64 * sp, u16 ix) {
-  return bitcast_u64_to_f64(sp[ix]);
+  return get_f64(&sp[ix]);
 }
 
-static enum ThreadResult op_abort(w64 *, u64 *, u64 *, struct OpTable *, w64) {
+static enum ThreadResult op_abort(b64 *, u64 *, u64 *, struct OpTable *, b64) {
   return THREAD_RESULT_ABORT;
 }
 
-static enum ThreadResult op_branch(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  bool p = var_bool(sp, le_u16(&iw.h1));
-  s16 k = p ? le_s16(&iw.h2) : le_s16(&iw.h3);
+static enum ThreadResult op_branch(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  bool p = var_bool(sp, get_le_u16(&iw.h1));
+  s16 k = p ? get_le_s16(&iw.h2) : get_le_s16(&iw.h3);
 
   ip = ip - 1 + k;
   iw = * ip ++;
-  vp = sp + le_u16(&iw.h2);
+  vp = sp + get_le_u16(&iw.h2);
 
-  assert(le_u16(&iw.h0) == OP_LABEL);
-  assert(le_u16(&iw.h1) == 0);
+  assert(get_le_u16(&iw.h0) == OP_LABEL);
+  assert(get_le_u16(&iw.h1) == 0);
 
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_exit(w64 *, u64 *, u64 *, struct OpTable *, w64) {
+static enum ThreadResult op_exit(b64 *, u64 *, u64 *, struct OpTable *, b64) {
   return THREAD_RESULT_OK;
 }
 
 /*
 
-static enum ThreadResult op_jump(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  u16 n = le_u16(&iw.h1);       // num args
-  s16 k = (s16) le_u16(&iw.h2); // jump offset
+static enum ThreadResult op_jump(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  u16 n = get_le_u16(&iw.h1);       // num args
+  s16 k = (s16) get_le_u16(&iw.h2); // jump offset
   u64 * ap = ip;
 
   (void) n;
@@ -94,10 +94,10 @@ static enum ThreadResult op_jump(w64 * ip, u64 * sp, u64 * vp, struct OpTable * 
 
   ip = ip - 1 + k;
   iw = * ip ++;
-  vp = sp + le_u16(&iw.h2);
+  vp = sp + get_le_u16(&iw.h2);
 
-  assert(le_u16(&iw.h0) == OP_LABEL);
-  assert(le_u16(&iw.h1) == n);
+  assert(get_le_u16(&iw.h0) == OP_LABEL);
+  assert(get_le_u16(&iw.h1) == n);
 
   // TODO pass args
   //
@@ -111,81 +111,69 @@ static enum ThreadResult op_jump(w64 * ip, u64 * sp, u64 * vp, struct OpTable * 
 
 */
 
-static enum ThreadResult op_nop(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
+static enum ThreadResult op_nop(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_show_i64(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  u64 x = var_i64(sp, le_u16(&iw.h1));
+static enum ThreadResult op_show_i64(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  u64 x = var_i64(sp, get_le_u16(&iw.h1));
   printf("%" PRIi64 "\n", x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_const_i32(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  * vp ++ = le_u32(&iw.w1);
+static enum ThreadResult op_const_i32(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  set_u32(vp ++, get_le_u32(&iw.w1));
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_const_i64(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  * vp ++ = le_u64(ip ++);
+static enum ThreadResult op_const_i64(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  set_u64(vp ++, get_le_u64(ip ++));
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-/*
-
-static enum ThreadResult op_const_v256(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  * vp ++ = * ip ++;
-  * vp ++ = * ip ++;
-  * vp ++ = * ip ++;
-  * vp ++ = * ip ++;
-  TAIL return dispatch(ip, sp, vp, tp, iw);
-}
-
-*/
-
-static enum ThreadResult op_prim_f32_add(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  f32 x = var_f32(sp, le_u16(&iw.h1));
-  f32 y = var_f32(sp, le_u16(&iw.h2));
+static enum ThreadResult op_prim_f32_add(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  f32 x = var_f32(sp, get_le_u16(&iw.h1));
+  f32 y = var_f32(sp, get_le_u16(&iw.h2));
   f32 z = x + y;
-  * vp ++ = bitcast_f32_to_u32(z);
+  set_f32(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_prim_f32_sqrt(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  f32 x = var_f32(sp, le_u16(&iw.h1));
+static enum ThreadResult op_prim_f32_sqrt(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  f32 x = var_f32(sp, get_le_u16(&iw.h1));
   f32 y = sqrtf(x);
-  * vp ++ = bitcast_f32_to_u32(y);
+  set_f32(vp ++, y);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_prim_f64_add(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  f64 x = var_f64(sp, le_u16(&iw.h1));
-  f64 y = var_f64(sp, le_u16(&iw.h2));
+static enum ThreadResult op_prim_f64_add(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  f64 x = var_f64(sp, get_le_u16(&iw.h1));
+  f64 y = var_f64(sp, get_le_u16(&iw.h2));
   f64 z = x + y;
-  * vp ++ = bitcast_f64_to_u64(z);
+  set_f64(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_prim_f64_sqrt(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  f64 x = var_f64(sp, le_u16(&iw.h1));
+static enum ThreadResult op_prim_f64_sqrt(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  f64 x = var_f64(sp, get_le_u16(&iw.h1));
   f64 y = sqrt(x);
-  * vp ++ = bitcast_f64_to_u64(y);
+  set_f64(vp ++, y);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_prim_i32_add(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  u32 x = var_i32(sp, le_u16(&iw.h1));
-  u32 y = var_i32(sp, le_u16(&iw.h2));
+static enum ThreadResult op_prim_i32_add(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  u32 x = var_i32(sp, get_le_u16(&iw.h1));
+  u32 y = var_i32(sp, get_le_u16(&iw.h2));
   u32 z = x + y;
-  * vp ++ = z;
+  set_u32(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
-static enum ThreadResult op_prim_i64_add(w64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, w64 iw) {
-  u64 x = var_i64(sp, le_u16(&iw.h1));
-  u64 y = var_i64(sp, le_u16(&iw.h2));
+static enum ThreadResult op_prim_i64_add(b64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, b64 iw) {
+  u64 x = var_i64(sp, get_le_u16(&iw.h1));
+  u64 y = var_i64(sp, get_le_u16(&iw.h2));
   u64 z = x + y;
-  * vp ++ = z;
+  set_u64(vp ++, z);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
@@ -201,7 +189,6 @@ static struct OpTable OP_TABLE = {
     [OP_CONST_F64] = op_const_i64, // same as op_const_i64
     [OP_CONST_I32] = op_const_i32,
     [OP_CONST_I64] = op_const_i64,
-    // [OP_CONST_V256] = op_const_v256,
     [OP_PRIM_F32_ADD] = op_prim_f32_add,
     [OP_PRIM_F32_SQRT] = op_prim_f32_sqrt,
     [OP_PRIM_F64_ADD] = op_prim_f64_add,
@@ -210,23 +197,23 @@ static struct OpTable OP_TABLE = {
   },
 };
 
-static enum ThreadResult interpret(w64 * ip) {
+static enum ThreadResult interpret(b64 * ip) {
   u64 stack[256] = { 0 };
 
-  return dispatch(ip, &stack[0], &stack[0], &OP_TABLE, le_u64_to_w64(0));
+  return dispatch(ip, &stack[0], &stack[0], &OP_TABLE, le_u64_to_b64(0));
 }
 
 int main(int, char **) {
-  w64 code[256] = { 0 };
+  b64 code[256] = { 0 };
 
-  w64 * p = &code[0];
+  b64 * p = &code[0];
 
   (void) p;
 
   * p ++ = iw_make_o___(OP_CONST_I64);
-  * p ++ = le_u64_to_w64(13);
+  * p ++ = le_u64_to_b64(13);
   * p ++ = iw_make_o___(OP_CONST_I64);
-  * p ++ = le_u64_to_w64((u64) -1);
+  * p ++ = le_u64_to_b64((u64) -1);
   * p ++ = iw_make_ohh_(OP_PRIM_I64_ADD, 0, 1);
   * p ++ = iw_make_oh__(OP_SHOW_I64, 2);
   * p ++ = iw_make_o___(OP_EXIT);

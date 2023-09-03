@@ -13,16 +13,16 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-typedef struct { uint16_t value; } w16;
-typedef struct { uint32_t value; } w32;
+typedef struct { uint16_t value; } b16;
+typedef struct { uint32_t value; } b32;
 
 typedef struct {
   union {
     uint64_t value;
-    struct { w16 h0; w16 h1; w16 h2; w16 h3; };
-    struct { w32 w0; w32 w1; };
+    struct { b16 h0; b16 h1; b16 h2; b16 h3; };
+    struct { b32 w0; b32 w1; };
   };
-} w64;
+} b64;
 
 static_assert(sizeof(byte) == 1);
 static_assert(sizeof(f32) == 4);
@@ -35,36 +35,82 @@ static_assert(sizeof(u8) == 1);
 static_assert(sizeof(u16) == 2);
 static_assert(sizeof(u32) == 4);
 static_assert(sizeof(u64) == 8);
-static_assert(sizeof(w16) == 2);
-static_assert(sizeof(w32) == 4);
-static_assert(sizeof(w64) == 8 && alignof(w64) == 8);
+static_assert(sizeof(b16) == 2 && alignof(b16) == 2);
+static_assert(sizeof(b32) == 4 && alignof(b32) == 4);
+static_assert(sizeof(b64) == 8 && alignof(b64) == 8);
 
 
 
 ////////
 
-STATIC_INLINE s16 le_s16(void * p) {
+STATIC_INLINE f32 get_f32(void * p) {
+  f32 x;
+  memcpy(&x, p, 4);
+  return x;
+}
+
+STATIC_INLINE f64 get_f64(void * p) {
+  f64 x;
+  memcpy(&x, p, 8);
+  return x;
+}
+
+STATIC_INLINE u8 get_u8(void * p) {
+  u8 x;
+  memcpy(&x, p, 1);
+  return x;
+}
+
+STATIC_INLINE u32 get_u32(void * p) {
+  u32 x;
+  memcpy(&x, p, 4);
+  return x;
+}
+
+STATIC_INLINE u64 get_u64(void * p) {
+  u64 x;
+  memcpy(&x, p, 8);
+  return x;
+}
+
+STATIC_INLINE void set_u32(void * p, u32 x) {
+  memcpy(p, &x, 4);
+}
+
+STATIC_INLINE void set_u64(void * p, u64 x) {
+  memcpy(p, &x, 8);
+}
+
+STATIC_INLINE void set_f32(void * p, f32 x) {
+  memcpy(p, &x, 4);
+}
+
+STATIC_INLINE void set_f64(void * p, f64 x) {
+  memcpy(p, &x, 8);
+}
+
+STATIC_INLINE s16 get_le_s16(void * p) {
   // TODO: maybe byteswap
   s16 x;
   memcpy(&x, p, 2);
   return x;
 }
 
-STATIC_INLINE u16 le_u16(void * p) {
+STATIC_INLINE u16 get_le_u16(void * p) {
   // TODO: maybe byteswap
   u16 x;
   memcpy(&x, p, 2);
   return x;
 }
 
-STATIC_INLINE u32 le_u32(void * p) {
+STATIC_INLINE u32 get_le_u32(void * p) {
   // TODO: maybe byteswap
   u32 x;
   memcpy(&x, p, 4);
   return x;
 }
 
-STATIC_INLINE u64 le_u64(void * p) {
+STATIC_INLINE u64 get_le_u64(void * p) {
   // TODO: maybe byteswap
   u64 x;
   memcpy(&x, p, 8);
@@ -74,82 +120,23 @@ STATIC_INLINE u64 le_u64(void * p) {
 ////////
 
 
-STATIC_INLINE u16 le_w16_to_u16(w16 x) {
+STATIC_INLINE b16 le_u16_to_b16(u16 x) {
   // TODO: maybe byteswap
-  u16 y;
+  b16 y;
   memcpy(&y, &x, 2);
   return y;
 }
 
-STATIC_INLINE u32 le_w32_to_u32(w32 x) {
+STATIC_INLINE b32 le_u32_to_b32(u32 x) {
   // TODO: maybe byteswap
-  u32 y;
+  b32 y;
   memcpy(&y, &x, 4);
   return y;
 }
 
-STATIC_INLINE u64 le_w64_to_u64(w64 x) {
+STATIC_INLINE b64 le_u64_to_b64(u64 x) {
   // TODO: maybe byteswap
-  u64 y;
+  b64 y;
   memcpy(&y, &x, 8);
-  return y;
-}
-
-STATIC_INLINE f32 le_w32_to_f32(w32 x) {
-  // TODO: maybe byteswap
-  f32 y;
-  memcpy(&y, &x, 4);
-  return y;
-}
-
-STATIC_INLINE f64 le_w64_to_f64(w64 x) {
-  // TODO: maybe byteswap
-  f64 y;
-  memcpy(&y, &x, 8);
-  return y;
-}
-
-STATIC_INLINE w16 le_u16_to_w16(u16 x) {
-  // TODO: maybe byteswap
-  w16 y;
-  memcpy(&y, &x, 2);
-  return y;
-}
-
-STATIC_INLINE w32 le_u32_to_w32(u32 x) {
-  // TODO: maybe byteswap
-  w32 y;
-  memcpy(&y, &x, 4);
-  return y;
-}
-
-STATIC_INLINE w64 le_u64_to_w64(u64 x) {
-  // TODO: maybe byteswap
-  w64 y;
-  memcpy(&y, &x, 8);
-  return y;
-}
-
-STATIC_INLINE f64 bitcast_u64_to_f64(u64 x) {
-  f64 y;
-  memcpy(&y, &x, 8);
-  return y;
-}
-
-STATIC_INLINE f32 bitcast_u32_to_f32(u32 x) {
-  f32 y;
-  memcpy(&y, &x, 4);
-  return y;
-}
-
-STATIC_INLINE u64 bitcast_f64_to_u64(f64 x) {
-  u64 y;
-  memcpy(&y, &x, 8);
-  return y;
-}
-
-STATIC_INLINE u32 bitcast_f32_to_u32(f32 x) {
-  u32 y;
-  memcpy(&y, &x, 4);
   return y;
 }
