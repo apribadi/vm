@@ -1,6 +1,6 @@
 typedef unsigned char byte;
 
-// TODO: endian agnostic
+// TODO: big endian support
 
 STATIC_INLINE u8 get_i8(byte * p) {
   return p[0];
