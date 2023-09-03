@@ -5,10 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define STATIC_INLINE static inline __attribute__((always_inline))
-#define TAIL __attribute__((musttail))
-
-#include "base.c"
+#include "prelude.c"
 #include "code.c"
 
 enum ThreadResult: u8 {
@@ -40,24 +37,20 @@ STATIC_INLINE enum ThreadResult dispatch(
   TAIL return tp->dispatch[wo_h0(wo)](ip, sp, vp, tp, wo);
 }
 
-STATIC_INLINE u64 * var_at(u64 * sp, u64 wo, size_t ix) {
-  return sp + (u16) (wo >> 16 * ix);
+STATIC_INLINE u64 var_i64(u64 * sp, u16 ix) {
+  return sp[ix];
 }
 
-STATIC_INLINE u64 var_i64(u64 * sp, u64 wo, size_t ix) {
-  return * var_at(sp, wo, ix);
+STATIC_INLINE u32 var_i32(u64 * sp, u16 ix) {
+  return var_i64(sp, ix);
 }
 
-STATIC_INLINE u32 var_i32(u64 * sp, u64 wo, size_t ix) {
-  return var_i64(sp, wo, ix);
+STATIC_INLINE f32 var_f32(u64 * sp, u16 ix) {
+  return i32_to_f32(var_i32(sp, ix));
 }
 
-STATIC_INLINE f32 var_f32(u64 * sp, u64 wo, size_t ix) {
-  return i32_to_f32(var_i32(sp, wo, ix));
-}
-
-STATIC_INLINE f64 var_f64(u64 * sp, u64 wo, size_t ix) {
-  return i64_to_f64(var_i64(sp, wo, ix));
+STATIC_INLINE f64 var_f64(u64 * sp, u16 ix) {
+  return i64_to_f64(var_i64(sp, ix));
 }
 
 STATIC_INLINE void out_i64(u64 * vp, u64 x) {
@@ -90,7 +83,7 @@ enum ThreadResult op_nop(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 
 }
 
 enum ThreadResult op_show_i64(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 wo) {
-  u64 x = var_i64(sp, wo, 1);
+  u64 x = var_i64(sp, wo_h1(wo));
   printf("%" PRId64 "\n", x);
   ip += 1;
   TAIL return dispatch(ip, sp, vp, tp, * ip);
@@ -113,8 +106,8 @@ enum ThreadResult op_const_i64(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp
 }
 
 enum ThreadResult op_prim_i32_add(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 wo) {
-  u32 x = var_i32(sp, wo, 1);
-  u32 y = var_i32(sp, wo, 2);
+  u32 x = var_i32(sp, wo_h1(wo));
+  u32 y = var_i32(sp, wo_h2(wo));
   u32 z = x + y;
   out_i32(vp, z);
   ip += 1;
@@ -123,8 +116,8 @@ enum ThreadResult op_prim_i32_add(u64 * ip, u64 * sp, u64 * vp, struct OpTable *
 }
 
 enum ThreadResult op_prim_i64_add(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 wo) {
-  u64 x = var_i64(sp, wo, 1);
-  u64 y = var_i64(sp, wo, 2);
+  u64 x = var_i64(sp, wo_h1(wo));
+  u64 y = var_i64(sp, wo_h2(wo));
   u64 z = x + y;
   out_i64(vp, z);
   ip += 1;
@@ -139,7 +132,7 @@ static struct OpTable OP_TABLE = {
     [OP_NOP] = op_nop,
     [OP_SHOW_I64] = op_show_i64,
     [OP_CONST_F32] = op_const_i32, // same as op_const_i32
-    [OP_CONST_F64] = op_const_i64, // same as_op_const_i64
+    [OP_CONST_F64] = op_const_i64, // same as op_const_i64
     [OP_CONST_I32] = op_const_i32,
     [OP_CONST_I64] = op_const_i64,
     [OP_PRIM_I32_ADD] = op_prim_i32_add,
@@ -148,13 +141,13 @@ static struct OpTable OP_TABLE = {
 };
 
 enum ThreadResult interpret(u64 * ip) {
-  u64 stack[1024];
+  u64 stack[256];
 
   return dispatch(ip, &stack[0], &stack[0], &OP_TABLE, * ip);
 }
 
 int main(int argc, char ** argv) {
-  u64 code[1024] = { 0 };
+  u64 code[256] = { 0 };
 
   u64 * p = &code[0];
 
@@ -170,10 +163,10 @@ int main(int argc, char ** argv) {
 
   switch (r) {
     case THREAD_RESULT_OK:
-      printf("exit ok\n");
+      printf("ok\n");
       break;
     case THREAD_RESULT_ABORT:
-      printf("aborting ...\n");
+      printf("aborting\n");
       break;
   }
 

@@ -1,3 +1,6 @@
+#define STATIC_INLINE static inline __attribute__((always_inline))
+#define TAIL __attribute__((musttail))
+
 typedef float f32;
 typedef double f64;
 typedef int8_t s8;
