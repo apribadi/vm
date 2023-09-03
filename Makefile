@@ -9,7 +9,7 @@ clean:
 
 pal: src/*.c
 	clang -o pal src/pal.c \
-		-std=c17 \
+		-std=c2x \
 		-O2 \
 		-Wall \
 		-Wconversion \
@@ -29,7 +29,7 @@ pal: src/*.c
 
 pal-debug: src/*.c
 	clang -o pal-debug src/pal.c \
-		-std=c17 \
+		-std=c2x \
 		-O2 \
 		-Wall \
 		-Wconversion \

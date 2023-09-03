@@ -34,10 +34,8 @@ STATIC_INLINE enum ThreadResult dispatch(
     u64 * sp,
     u64 * vp,
     struct OpTable * tp,
-    u64 old_iw
+    u64
 ) {
-  (void) old_iw;
-
   u64 iw = * ip ++;
   TAIL return tp->dispatch[iw_b0(iw)](ip, sp, vp, tp, iw);
 }
@@ -62,24 +60,8 @@ STATIC_INLINE f64 var_f64(u64 * sp, u16 ix) {
   return bitcast_u64_to_f64(sp[ix]);
 }
 
-static enum ThreadResult op_abort(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
-  (void) ip;
-  (void) sp;
-  (void) vp;
-  (void) tp;
-  (void) iw;
-
+static enum ThreadResult op_abort(u64 *, u64 *, u64 *, struct OpTable *, u64) {
   return THREAD_RESULT_ABORT;
-}
-
-static enum ThreadResult op_exit(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
-  (void) ip;
-  (void) sp;
-  (void) vp;
-  (void) tp;
-  (void) iw;
-
-  return THREAD_RESULT_OK;
 }
 
 static enum ThreadResult op_branch(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
@@ -92,6 +74,35 @@ static enum ThreadResult op_branch(u64 * ip, u64 * sp, u64 * vp, struct OpTable 
 
   assert(iw_b0(iw) == OP_LABEL);
   assert(iw_b1(iw) == 0);
+
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
+static enum ThreadResult op_exit(u64 *, u64 *, u64 *, struct OpTable *, u64) {
+  return THREAD_RESULT_OK;
+}
+
+static enum ThreadResult op_jump(u64 * ip, u64 * sp, u64 * vp, struct OpTable * tp, u64 iw) {
+  u16 n = iw_b1(iw);       // num args
+  s16 k = (s16) iw_b2(iw); // jump offset
+  u64 * ap = ip;
+
+  (void) n;
+  (void) ap;
+
+  ip = ip - 1 + k;
+  iw = * ip ++;
+  vp = sp + iw_b2(iw);
+
+  assert(iw_b0(iw) == OP_LABEL);
+  assert(iw_b1(iw) == n);
+
+  // TODO pass args
+  //
+  // for n args
+  //   read arg index from ap
+  //   get type from ip
+  //   write to vp
 
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
@@ -175,6 +186,7 @@ static struct OpTable OP_TABLE = {
     [OP_ABORT] = op_abort,
     [OP_BRANCH] = op_branch,
     [OP_EXIT] = op_exit,
+    [OP_JUMP] = op_jump,
     [OP_NOP] = op_nop,
     [OP_SHOW_I64] = op_show_i64,
     [OP_CONST_F32] = op_const_i32, // same as op_const_i32
@@ -191,15 +203,12 @@ static struct OpTable OP_TABLE = {
 };
 
 static enum ThreadResult interpret(u64 * ip) {
-  u64 stack[256];
+  u64 stack[256] = { 0 };
 
   return dispatch(ip, &stack[0], &stack[0], &OP_TABLE, 0);
 }
 
-int main(int argc, char ** argv) {
-  (void) argc;
-  (void) argv;
-
+int main(int, char **) {
   u64 code[256] = { 0 };
 
   u64 * p = &code[0];
