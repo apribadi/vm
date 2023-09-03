@@ -5,9 +5,9 @@ enum Op: u16 {
   OP_CALL_INDIRECT,
   OP_CALL_INDIRECT_TAIL,
   OP_CALL_TAIL,
-  OP_ENTRY,
+  OP_ENTER,
   OP_EXIT,
-  OP_GOTO,
+  OP_JUMP,
   OP_LABEL,
   OP_NOP,
   OP_RET,
@@ -163,7 +163,7 @@ STATIC_INLINE u64 wo_make_ohhh(enum Op op, u16 h1, u16 h2, u16 h3) {
       (u64) ((u64) op      )
     | (u64) ((u64) h1 << 16)
     | (u64) ((u64) h2 << 32)
-    | (u64) ((u64) h2 << 48);
+    | (u64) ((u64) h3 << 48);
 }
 
 STATIC_INLINE u64 wo_make_o___(enum Op op) {
@@ -179,21 +179,21 @@ STATIC_INLINE u64 wo_make_ohh_(enum Op op, u16 h1, u16 h2) {
 }
 
 STATIC_INLINE u16 wo_h0(u64 wo) {
-  return wo;
+  return (u16) wo;
 }
 
 STATIC_INLINE u16 wo_h1(u64 wo) {
-  return wo >> 16;
+  return (u16) (wo >> 16);
 }
 
 STATIC_INLINE u16 wo_h2(u64 wo) {
-  return wo >> 32;
+  return (u16) (wo >> 32);
 }
 
 STATIC_INLINE u16 wo_h3(u64 wo) {
-  return wo >> 48;
+  return (u16) (wo >> 48);
 }
 
 STATIC_INLINE u32 wo_w1(u64 wo) {
-  return wo >> 32;
+  return (u16) (wo >> 32);
 }
