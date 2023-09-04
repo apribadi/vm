@@ -159,16 +159,12 @@ enum Ty: u8 {
 };
 
 STATIC_INLINE b64 iw_make_ohhh(enum Op t, u16 x, u16 y, u16 z) {
-  b16 h0 = le_u16_to_b16(t);
-  b16 h1 = le_u16_to_b16(x);
-  b16 h2 = le_u16_to_b16(y);
-  b16 h3 = le_u16_to_b16(z);
-  b64 iw;
-  memcpy(&iw.h0, &h0, 2);
-  memcpy(&iw.h1, &h1, 2);
-  memcpy(&iw.h2, &h2, 2);
-  memcpy(&iw.h3, &h3, 2);
-  return iw;
+  b64 r;
+  set_le_u16(&r.h0, t);
+  set_le_u16(&r.h1, x);
+  set_le_u16(&r.h2, y);
+  set_le_u16(&r.h3, z);
+  return r;
 }
 
 STATIC_INLINE b64 iw_make_o___(enum Op op) {
@@ -181,4 +177,10 @@ STATIC_INLINE b64 iw_make_oh__(enum Op op, u16 x) {
 
 STATIC_INLINE b64 iw_make_ohh_(enum Op op, u16 x, u16 y) {
   return iw_make_ohhh(op, x, y, 0);
+}
+
+STATIC_INLINE b64 iw_make_d___(u64 x) {
+  b64 r;
+  set_le_u64(&r, x);
+  return r;
 }

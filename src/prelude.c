@@ -13,15 +13,19 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-typedef struct { uint16_t value; } b16;
-typedef struct { uint32_t value; } b32;
+typedef union b16 {
+  u16 value;
+} b16;
 
-typedef struct {
-  union {
-    uint64_t value;
-    struct { b16 h0; b16 h1; b16 h2; b16 h3; };
-    struct { b32 w0; b32 w1; };
-  };
+typedef union b32 {
+  u32 value;
+  struct { b16 h0; b16 h1; };
+} b32;
+
+typedef union b64 {
+  u64 value;
+  struct { b16 h0; b16 h1; b16 h2; b16 h3; };
+  struct { b32 w0; b32 w1; };
 } b64;
 
 static_assert(sizeof(byte) == 1);
@@ -38,8 +42,6 @@ static_assert(sizeof(u64) == 8);
 static_assert(sizeof(b16) == 2 && alignof(b16) == 2);
 static_assert(sizeof(b32) == 4 && alignof(b32) == 4);
 static_assert(sizeof(b64) == 8 && alignof(b64) == 8);
-
-////////
 
 STATIC_INLINE f32 get_f32(void * p) {
   f32 x;
@@ -129,26 +131,17 @@ STATIC_INLINE u64 get_le_u64(void * p) {
   return x;
 }
 
-////////
-
-
-STATIC_INLINE b16 le_u16_to_b16(u16 x) {
-  // TODO: maybe byteswap
-  b16 y;
-  memcpy(&y, &x, 2);
-  return y;
+STATIC_INLINE void set_le_u16(void * p, u16 x) {
+  // TODO: byteswap if big endian
+  memcpy(p, &x, 2);
 }
 
-STATIC_INLINE b32 le_u32_to_b32(u32 x) {
-  // TODO: maybe byteswap
-  b32 y;
-  memcpy(&y, &x, 4);
-  return y;
+STATIC_INLINE void set_le_u32(void * p, u32 x) {
+  // TODO: byteswap if big endian
+  memcpy(p, &x, 4);
 }
 
-STATIC_INLINE b64 le_u64_to_b64(u64 x) {
-  // TODO: maybe byteswap
-  b64 y;
-  memcpy(&y, &x, 8);
-  return y;
+STATIC_INLINE void set_le_u64(void * p, u64 x) {
+  // TODO: byteswap if big endian
+  memcpy(p, &x, 8);
 }

@@ -211,7 +211,7 @@ static struct OpTable OP_TABLE = {
 static enum ThreadResult interpret(b64 * ip) {
   b64 stack[256] = { 0 };
 
-  return dispatch(ip, &stack[0], &stack[0], &OP_TABLE, le_u64_to_b64(0));
+  return dispatch(ip, &stack[0], &stack[0], &OP_TABLE, iw_make_d___(0));
 }
 
 int main(int, char **) {
@@ -222,14 +222,14 @@ int main(int, char **) {
   (void) p;
 
   * p ++ = iw_make_o___(OP_CONST_I64);
-  * p ++ = le_u64_to_b64(13);
+  * p ++ = iw_make_d___(13);
   * p ++ = iw_make_o___(OP_CONST_I64);
-  * p ++ = le_u64_to_b64((u64) -1);
+  * p ++ = iw_make_d___((u64) -1);
   * p ++ = iw_make_ohh_(OP_PRIM_I64_ADD, 0, 1);
   * p ++ = iw_make_oh__(OP_SHOW_I64, 2);
   * p ++ = iw_make_o___(OP_EXIT);
 
-  // disassemble(code, p);
+  disassemble(code, p);
 
   enum ThreadResult r = interpret(&code[0]);
 
