@@ -158,7 +158,7 @@ enum Ty: u8 {
   TY_V256,
 };
 
-STATIC_INLINE b64 iw_make_ohhh(enum Op t, u16 x, u16 y, u16 z) {
+STATIC_INLINE b64 iw_make_hhhh(enum Op t, u16 x, u16 y, u16 z) {
   b64 r;
   set_le_u16(&r.h0, t);
   set_le_u16(&r.h1, x);
@@ -167,20 +167,33 @@ STATIC_INLINE b64 iw_make_ohhh(enum Op t, u16 x, u16 y, u16 z) {
   return r;
 }
 
-STATIC_INLINE b64 iw_make_o___(enum Op op) {
-  return iw_make_ohhh(op, 0, 0, 0);
+STATIC_INLINE b64 iw_make_h___(enum Op op) {
+  return iw_make_hhhh(op, 0, 0, 0);
 }
 
-STATIC_INLINE b64 iw_make_oh__(enum Op op, u16 x) {
-  return iw_make_ohhh(op, x, 0, 0);
+STATIC_INLINE b64 iw_make_hh__(enum Op op, u16 x) {
+  return iw_make_hhhh(op, x, 0, 0);
 }
 
-STATIC_INLINE b64 iw_make_ohh_(enum Op op, u16 x, u16 y) {
-  return iw_make_ohhh(op, x, y, 0);
+STATIC_INLINE b64 iw_make_hhh_(enum Op op, u16 x, u16 y) {
+  return iw_make_hhhh(op, x, y, 0);
 }
 
 STATIC_INLINE b64 iw_make_d___(u64 x) {
   b64 r;
   set_le_u64(&r, x);
+  return r;
+}
+
+STATIC_INLINE b64 iw_make_bbbbbbbb(u8 a, u8 b, u8 c, u8 d, u8 e, u8 f, u8 g, u8 h) {
+  b64 r;
+  set_u8(&r.b[0], a);
+  set_u8(&r.b[1], b);
+  set_u8(&r.b[2], c);
+  set_u8(&r.b[3], d);
+  set_u8(&r.b[4], e);
+  set_u8(&r.b[5], f);
+  set_u8(&r.b[6], g);
+  set_u8(&r.b[7], h);
   return r;
 }

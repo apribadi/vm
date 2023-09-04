@@ -96,6 +96,10 @@ STATIC_INLINE void set_f64(void * p, f64 x) {
   memcpy(p, &x, 8);
 }
 
+STATIC_INLINE void set_u8(void * p, u8 x) {
+  memcpy(p, &x, 1);
+}
+
 STATIC_INLINE void set_u32(void * p, u32 x) {
   memcpy(p, &x, 4);
 }
@@ -104,59 +108,59 @@ STATIC_INLINE void set_u64(void * p, u64 x) {
   memcpy(p, &x, 8);
 }
 
-STATIC_INLINE f32 get_le_f32(void * p) {
+STATIC_INLINE f32 get_le_f32(b32 * p) {
   // TODO: byteswap if big endian
   f32 x;
   memcpy(&x, p, 4);
   return x;
 }
 
-STATIC_INLINE f64 get_le_f64(void * p) {
+STATIC_INLINE f64 get_le_f64(b64 * p) {
   // TODO: byteswap if big endian
   f64 x;
   memcpy(&x, p, 8);
   return x;
 }
 
-STATIC_INLINE s16 get_le_s16(void * p) {
+STATIC_INLINE s16 get_le_s16(b16 * p) {
   // TODO: byteswap if big endian
   s16 x;
   memcpy(&x, p, 2);
   return x;
 }
 
-STATIC_INLINE u16 get_le_u16(void * p) {
+STATIC_INLINE u16 get_le_u16(b16 * p) {
   // TODO: byteswap if big endian
   u16 x;
   memcpy(&x, p, 2);
   return x;
 }
 
-STATIC_INLINE u32 get_le_u32(void * p) {
+STATIC_INLINE u32 get_le_u32(b32 * p) {
   // TODO: byteswap if big endian
   u32 x;
   memcpy(&x, p, 4);
   return x;
 }
 
-STATIC_INLINE u64 get_le_u64(void * p) {
+STATIC_INLINE u64 get_le_u64(b64 * p) {
   // TODO: byteswap if big endian
   u64 x;
   memcpy(&x, p, 8);
   return x;
 }
 
-STATIC_INLINE void set_le_u16(void * p, u16 x) {
+STATIC_INLINE void set_le_u16(b16 * p, u16 x) {
   // TODO: byteswap if big endian
   memcpy(p, &x, 2);
 }
 
-STATIC_INLINE void set_le_u32(void * p, u32 x) {
+STATIC_INLINE void set_le_u32(b32 * p, u32 x) {
   // TODO: byteswap if big endian
   memcpy(p, &x, 4);
 }
 
-STATIC_INLINE void set_le_u64(void * p, u64 x) {
+STATIC_INLINE void set_le_u64(b64 * p, u64 x) {
   // TODO: byteswap if big endian
   memcpy(p, &x, 8);
 }
