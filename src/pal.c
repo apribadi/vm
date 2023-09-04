@@ -82,15 +82,15 @@ static enum ThreadResult op_exit(b64 *, b64 *, b64 *, struct OpTable *, b64) {
   return THREAD_RESULT_OK;
 }
 
-static enum ThreadResult op_jump(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  b64 tmp[256];
+static b64 tmp[256];
 
+static enum ThreadResult op_jump(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
   u16 n = get_le_u16(&iw.h1); // num args
   s16 k = get_le_s16(&iw.h2); // jump offset
-  u16 i = 0;
 
-  b64 * jp = ip;  // argument variable pointer
-  b64 * wp = tmp; // argument stack pointer
+  b64 * ap = ip; // argument pointer
+  b64 * bp = tmp; // ???
+  b64 * cp = tmp; // ???
 
   ip = ip - 1 + k;
   iw = * ip ++;
@@ -99,32 +99,38 @@ static enum ThreadResult op_jump(b64 * ip, b64 * sp, b64 * vp, struct OpTable * 
   assert(get_le_u16(&iw.h0) == OP_LABEL);
   assert(get_le_u16(&iw.h1) == n);
 
-  b64 jw;
-
-  // copy args to temporary area
-
-  while (i < n) {
-    if ((i & 3) == 0) { jw = * jp ++; } // get more vars
-    if ((i & 7) == 0) { iw = * ip ++; } // get more types
-
-    u16 ix = get_le_u16(&jw.h[i & 3]);
-    u8 ty = get_u8(&iw.b[i & 7]);
-
-    (void) ty;
-
-    * wp ++ = sp[ix]; // TODO: copy more words for some values of ty
-
-    i ++;
-  }
-
-  // copy args to frame slots
-
-  b64 * xp = tmp;
+  b64 x;
+  b64 y;
+  u16 i = 0;
 
   for (;;) {
-    if (xp == wp) break;
+    // TODO: multi-word values
 
-    * vp ++ = * xp ++;
+    if (i ++ == n) break;
+    x = * ap ++;
+    y = * ip ++;
+    * bp ++ = sp[get_le_u16(&x.h0)];
+    if (i ++ == n) break;
+    * bp ++ = sp[get_le_u16(&x.h1)];
+    if (i ++ == n) break;
+    * bp ++ = sp[get_le_u16(&x.h2)];
+    if (i ++ == n) break;
+    * bp ++ = sp[get_le_u16(&x.h3)];
+    if (i ++ == n) break;
+    x = * ap ++;
+    * bp ++ = sp[get_le_u16(&x.h0)];
+    if (i ++ == n) break;
+    * bp ++ = sp[get_le_u16(&x.h1)];
+    if (i ++ == n) break;
+    * bp ++ = sp[get_le_u16(&x.h2)];
+    if (i ++ == n) break;
+    * bp ++ = sp[get_le_u16(&x.h3)];
+
+    (void) y;
+  }
+
+  while (cp != bp) {
+    * vp ++ = * cp ++;
   }
 
   TAIL return dispatch(ip, sp, vp, tp, iw);
@@ -253,6 +259,8 @@ int main(int, char **) {
 
   (void) p;
 
+  /*
+
   * p ++ = iw_make_o___(OP_CONST_I64);
   * p ++ = iw_make_d___(13);
   * p ++ = iw_make_o___(OP_CONST_I64);
@@ -260,6 +268,8 @@ int main(int, char **) {
   * p ++ = iw_make_ohh_(OP_PRIM_I64_ADD, 0, 1);
   * p ++ = iw_make_oh__(OP_SHOW_I64, 2);
   * p ++ = iw_make_o___(OP_EXIT);
+
+  */
 
   disassemble(code, p);
 
