@@ -82,15 +82,15 @@ static enum ThreadResult op_exit(b64 *, b64 *, b64 *, struct OpTable *, b64) {
   return THREAD_RESULT_OK;
 }
 
-/*
-
 static enum ThreadResult op_jump(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  u16 n = get_le_u16(&iw.h1);       // num args
-  s16 k = (s16) get_le_u16(&iw.h2); // jump offset
-  b64 * ap = ip;
+  b64 tmp[256];
 
-  (void) n;
-  (void) ap;
+  u16 n = get_le_u16(&iw.h1); // num args
+  s16 k = get_le_s16(&iw.h2); // jump offset
+  u16 i = 0;
+
+  b64 * jp = ip;  // argument variable pointer
+  b64 * wp = tmp; // argument stack pointer
 
   ip = ip - 1 + k;
   iw = * ip ++;
@@ -99,17 +99,36 @@ static enum ThreadResult op_jump(b64 * ip, b64 * sp, b64 * vp, struct OpTable * 
   assert(get_le_u16(&iw.h0) == OP_LABEL);
   assert(get_le_u16(&iw.h1) == n);
 
-  // TODO pass args
-  //
-  // for n args
-  //   read arg index from ap
-  //   get type from ip
-  //   write to vp
+  b64 jw;
+
+  // copy args to temporary area
+
+  while (i < n) {
+    if ((i & 3) == 0) { jw = * jp ++; } // get more vars
+    if ((i & 7) == 0) { iw = * ip ++; } // get more types
+
+    u16 ix = get_le_u16(&jw.h[i & 3]);
+    u8 ty = get_u8(&iw.b[i & 7]);
+
+    (void) ty;
+
+    * wp ++ = sp[ix]; // TODO: copy more words for some values of ty
+
+    i ++;
+  }
+
+  // copy args to frame slots
+
+  b64 * xp = tmp;
+
+  for (;;) {
+    if (xp == wp) break;
+
+    * vp ++ = * xp ++;
+  }
 
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
-
-*/
 
 static enum ThreadResult op_nop(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
   TAIL return dispatch(ip, sp, vp, tp, iw);
@@ -204,7 +223,7 @@ static struct OpTable OP_TABLE = {
     [OP_ABORT] = op_abort,
     [OP_BRANCH] = op_branch,
     [OP_EXIT] = op_exit,
-    // [OP_JUMP] = op_jump,
+    [OP_JUMP] = op_jump,
     [OP_NOP] = op_nop,
     [OP_SHOW_I64] = op_show_i64,
     [OP_CONST_F32] = op_const_f32,

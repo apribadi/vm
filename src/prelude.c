@@ -19,11 +19,15 @@ typedef union b16 {
 
 typedef union b32 {
   u32 value;
+  b16 h[2];
   struct { b16 h0; b16 h1; };
 } b32;
 
 typedef union b64 {
   u64 value;
+  byte b[8];
+  b16 h[4];
+  b32 w[2];
   struct { b16 h0; b16 h1; b16 h2; b16 h3; };
   struct { b32 w0; b32 w1; };
 } b64;
@@ -59,6 +63,12 @@ STATIC_INLINE f32 get_f32(void * p) {
 STATIC_INLINE f64 get_f64(void * p) {
   f64 x;
   memcpy(&x, p, 8);
+  return x;
+}
+
+STATIC_INLINE u8 get_u8(void * p) {
+  u8 x;
+  memcpy(&x, p, 1);
   return x;
 }
 
