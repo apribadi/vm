@@ -28,6 +28,7 @@ typedef union b64 {
   struct { b32 w0; b32 w1; };
 } b64;
 
+static_assert(sizeof(bool) == 1);
 static_assert(sizeof(byte) == 1);
 static_assert(sizeof(f32) == 4);
 static_assert(sizeof(f64) == 8);
@@ -43,6 +44,12 @@ static_assert(sizeof(b16) == 2 && alignof(b16) == 2);
 static_assert(sizeof(b32) == 4 && alignof(b32) == 4);
 static_assert(sizeof(b64) == 8 && alignof(b64) == 8);
 
+STATIC_INLINE bool get_bool(void * p) {
+  bool x;
+  memcpy(&x, p, 1);
+  return x;
+}
+
 STATIC_INLINE f32 get_f32(void * p) {
   f32 x;
   memcpy(&x, p, 4);
@@ -52,12 +59,6 @@ STATIC_INLINE f32 get_f32(void * p) {
 STATIC_INLINE f64 get_f64(void * p) {
   f64 x;
   memcpy(&x, p, 8);
-  return x;
-}
-
-STATIC_INLINE u8 get_u8(void * p) {
-  u8 x;
-  memcpy(&x, p, 1);
   return x;
 }
 
@@ -71,6 +72,10 @@ STATIC_INLINE u64 get_u64(void * p) {
   u64 x;
   memcpy(&x, p, 8);
   return x;
+}
+
+STATIC_INLINE void set_bool(void * p, bool x) {
+  memcpy(p, &x, 1);
 }
 
 STATIC_INLINE void set_f32(void * p, f32 x) {

@@ -41,7 +41,7 @@ STATIC_INLINE enum ThreadResult dispatch(
 }
 
 STATIC_INLINE bool var_bool(b64 * sp, b16 * ix) {
-  return get_u8(&sp[get_le_u16(ix)]);
+  return get_bool(&sp[get_le_u16(ix)]);
 }
 
 STATIC_INLINE u32 var_i32(b64 * sp, b16 * ix) {
@@ -122,22 +122,26 @@ static enum ThreadResult op_show_i64(b64 * ip, b64 * sp, b64 * vp, struct OpTabl
 }
 
 static enum ThreadResult op_const_f32(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  set_f32(vp ++, get_le_f32(&iw.w1));
+  f32 x = get_le_f32(&iw.w1);
+  set_f32(vp ++, x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_const_f64(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  set_f64(vp ++, get_le_f64(ip ++));
+  f64 x = get_le_f64(ip ++);
+  set_f64(vp ++, x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_const_i32(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  set_u32(vp ++, get_le_u32(&iw.w1));
+  u32 x = get_le_u32(&iw.w1);
+  set_u32(vp ++, x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
 static enum ThreadResult op_const_i64(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
-  set_u64(vp ++, get_le_u64(ip ++));
+  u64 x = get_le_u64(ip ++);
+  set_u64(vp ++, x);
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
@@ -187,6 +191,14 @@ static enum ThreadResult op_prim_i64_add(b64 * ip, b64 * sp, b64 * vp, struct Op
   TAIL return dispatch(ip, sp, vp, tp, iw);
 }
 
+static enum ThreadResult op_prim_i64_is_eq(b64 * ip, b64 * sp, b64 * vp, struct OpTable * tp, b64 iw) {
+  u64 x = var_i64(sp, &iw.h1);
+  u64 y = var_i64(sp, &iw.h2);
+  bool z = x == y;
+  set_bool(vp ++, z);
+  TAIL return dispatch(ip, sp, vp, tp, iw);
+}
+
 static struct OpTable OP_TABLE = {
   .dispatch = {
     [OP_ABORT] = op_abort,
@@ -205,6 +217,7 @@ static struct OpTable OP_TABLE = {
     [OP_PRIM_F64_SQRT] = op_prim_f64_sqrt,
     [OP_PRIM_I32_ADD] = op_prim_i32_add,
     [OP_PRIM_I64_ADD] = op_prim_i64_add,
+    [OP_PRIM_I64_IS_EQ] = op_prim_i64_is_eq,
   },
 };
 

@@ -20,7 +20,6 @@ pal: src/*.c
 		-Wno-constant-logical-operand \
 		-Wno-fixed-enum-extension \
 		-Wno-pre-c2x-compat \
-		-Wno-unused-function \
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
@@ -43,7 +42,6 @@ pal-debug: src/*.c
 		-Wno-constant-logical-operand \
 		-Wno-fixed-enum-extension \
 		-Wno-pre-c2x-compat \
-		-Wno-unused-function \
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
