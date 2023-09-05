@@ -1,4 +1,4 @@
-enum Op: u16 {
+typedef enum Op : U16 {
   OP_ABORT,
   OP_BRANCH,
   OP_CALL,
@@ -145,9 +145,9 @@ enum Op: u16 {
   OP_PRIM_I64_TO_I5,
   OP_PRIM_I64_TO_I6,
   OP_COUNT,
-};
+} Op;
 
-enum Ty: u8 {
+typedef enum Ty : U8 {
   TY_BOOL,
   TY_F32,
   TY_F64,
@@ -156,10 +156,10 @@ enum Ty: u8 {
   TY_I6,
   TY_I64,
   TY_V256,
-};
+} Ty;
 
-STATIC_INLINE b64 iw_make_hhhh(enum Op t, u16 x, u16 y, u16 z) {
-  b64 r;
+STATIC_INLINE L64 ic_make_hhhh(Op t, U16 x, U16 y, U16 z) {
+  L64 r;
   set_le_u16(&r.h0, t);
   set_le_u16(&r.h1, x);
   set_le_u16(&r.h2, y);
@@ -167,26 +167,26 @@ STATIC_INLINE b64 iw_make_hhhh(enum Op t, u16 x, u16 y, u16 z) {
   return r;
 }
 
-STATIC_INLINE b64 iw_make_h___(enum Op op) {
-  return iw_make_hhhh(op, 0, 0, 0);
+STATIC_INLINE L64 ic_make_h___(Op op) {
+  return ic_make_hhhh(op, 0, 0, 0);
 }
 
-STATIC_INLINE b64 iw_make_hh__(enum Op op, u16 x) {
-  return iw_make_hhhh(op, x, 0, 0);
+STATIC_INLINE L64 ic_make_hh__(Op op, U16 x) {
+  return ic_make_hhhh(op, x, 0, 0);
 }
 
-STATIC_INLINE b64 iw_make_hhh_(enum Op op, u16 x, u16 y) {
-  return iw_make_hhhh(op, x, y, 0);
+STATIC_INLINE L64 ic_make_hhh_(Op op, U16 x, U16 y) {
+  return ic_make_hhhh(op, x, y, 0);
 }
 
-STATIC_INLINE b64 iw_make_d___(u64 x) {
-  b64 r;
+STATIC_INLINE L64 ic_make_d___(U64 x) {
+  L64 r;
   set_le_u64(&r, x);
   return r;
 }
 
-STATIC_INLINE b64 iw_make_bbbbbbbb(u8 a, u8 b, u8 c, u8 d, u8 e, u8 f, u8 g, u8 h) {
-  b64 r;
+STATIC_INLINE L64 ic_make_bbbbbbbb(U8 a, U8 b, U8 c, U8 d, U8 e, U8 f, U8 g, U8 h) {
+  L64 r;
   set_u8(&r.b[0], a);
   set_u8(&r.b[1], b);
   set_u8(&r.b[2], c);
