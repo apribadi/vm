@@ -102,59 +102,67 @@ static inline void set_u64(void * p, U64 x) {
   memcpy(p, &x, 8);
 }
 
-static inline F32 get_le_f32(L32 * p) {
+static inline F32 get_le_f32(void * p) {
   // TODO: byteswap if big endian
   F32 x;
   memcpy(&x, p, 4);
   return x;
 }
 
-static inline F64 get_le_f64(L64 * p) {
+static inline F64 get_le_f64(void * p) {
   // TODO: byteswap if big endian
   F64 x;
   memcpy(&x, p, 8);
   return x;
 }
 
-static inline S16 get_le_s16(L16 * p) {
+static inline U8 get_le_u8(void * p) {
+  // This is, of course, exactly the same as `get_u8`.
+
+  U8 x;
+  memcpy(&x, p, 1);
+  return x;
+}
+
+static inline S16 get_le_s16(void * p) {
   // TODO: byteswap if big endian
   S16 x;
   memcpy(&x, p, 2);
   return x;
 }
 
-static inline U16 get_le_u16(L16 * p) {
+static inline U16 get_le_u16(void * p) {
   // TODO: byteswap if big endian
   U16 x;
   memcpy(&x, p, 2);
   return x;
 }
 
-static inline U32 get_le_u32(L32 * p) {
+static inline U32 get_le_u32(void * p) {
   // TODO: byteswap if big endian
   U32 x;
   memcpy(&x, p, 4);
   return x;
 }
 
-static inline U64 get_le_u64(L64 * p) {
+static inline U64 get_le_u64(void * p) {
   // TODO: byteswap if big endian
   U64 x;
   memcpy(&x, p, 8);
   return x;
 }
 
-static inline void set_le_u16(L16 * p, U16 x) {
+static inline void set_le_u16(void * p, U16 x) {
   // TODO: byteswap if big endian
   memcpy(p, &x, 2);
 }
 
-static inline void set_le_u32(L32 * p, U32 x) {
+static inline void set_le_u32(void * p, U32 x) {
   // TODO: byteswap if big endian
   memcpy(p, &x, 4);
 }
 
-static inline void set_le_u64(L64 * p, U64 x) {
+static inline void set_le_u64(void * p, U64 x) {
   // TODO: byteswap if big endian
   memcpy(p, &x, 8);
 }
