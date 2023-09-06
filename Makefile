@@ -19,6 +19,7 @@ pal: src/*.c
 		-Wno-c++98-compat \
 		-Wno-constant-logical-operand \
 		-Wno-fixed-enum-extension \
+		-Wno-gnu-statement-expression-from-macro-expansion \
 		-Wno-pre-c2x-compat \
 		-ffp-contract=off \
 		-fno-math-errno \
@@ -41,6 +42,7 @@ pal-debug: src/*.c
 		-Wno-c++98-compat \
 		-Wno-constant-logical-operand \
 		-Wno-fixed-enum-extension \
+		-Wno-gnu-statement-expression-from-macro-expansion \
 		-Wno-pre-c2x-compat \
 		-ffp-contract=off \
 		-fno-math-errno \
