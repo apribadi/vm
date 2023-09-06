@@ -158,42 +158,29 @@ typedef enum Ty : U8 {
   TY_V256,
 } Ty;
 
-STATIC_INLINE L64 ic_make_hhhh(Op t, U16 x, U16 y, U16 z) {
+static inline L64 ic_make_hhhh(U16 h0, U16 h1, U16 h2, U16 h3) {
   L64 r;
-  set_le_u16(&r.h0, t);
-  set_le_u16(&r.h1, x);
-  set_le_u16(&r.h2, y);
-  set_le_u16(&r.h3, z);
+  set_le_u16(&r.h0, h0);
+  set_le_u16(&r.h1, h1);
+  set_le_u16(&r.h2, h2);
+  set_le_u16(&r.h3, h3);
   return r;
 }
 
-STATIC_INLINE L64 ic_make_h___(Op op) {
-  return ic_make_hhhh(op, 0, 0, 0);
+static inline L64 ic_make_h___(U16 h0) {
+  return ic_make_hhhh(h0, 0, 0, 0);
 }
 
-STATIC_INLINE L64 ic_make_hh__(Op op, U16 x) {
-  return ic_make_hhhh(op, x, 0, 0);
+static inline L64 ic_make_hh__(U16 h0, U16 h1) {
+  return ic_make_hhhh(h0, h1, 0, 0);
 }
 
-STATIC_INLINE L64 ic_make_hhh_(Op op, U16 x, U16 y) {
-  return ic_make_hhhh(op, x, y, 0);
+static inline L64 ic_make_hhh_(U16 h0, U16 h1, U16 h2) {
+  return ic_make_hhhh(h0, h1, h2, 0);
 }
 
-STATIC_INLINE L64 ic_make_d___(U64 x) {
+static inline L64 ic_make_d___(U64 x) {
   L64 r;
   set_le_u64(&r, x);
-  return r;
-}
-
-STATIC_INLINE L64 ic_make_bbbbbbbb(U8 a, U8 b, U8 c, U8 d, U8 e, U8 f, U8 g, U8 h) {
-  L64 r;
-  set_u8(&r.b[0], a);
-  set_u8(&r.b[1], b);
-  set_u8(&r.b[2], c);
-  set_u8(&r.b[3], d);
-  set_u8(&r.b[4], e);
-  set_u8(&r.b[5], f);
-  set_u8(&r.b[6], g);
-  set_u8(&r.b[7], h);
   return r;
 }
