@@ -21,6 +21,8 @@ pal: src/*.c
 		-Wno-fixed-enum-extension \
 		-Wno-gnu-statement-expression-from-macro-expansion \
 		-Wno-pre-c2x-compat \
+		-Wno-shadow \
+		-Wno-shift-op-parentheses \
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
@@ -44,6 +46,8 @@ pal-debug: src/*.c
 		-Wno-fixed-enum-extension \
 		-Wno-gnu-statement-expression-from-macro-expansion \
 		-Wno-pre-c2x-compat \
+		-Wno-shadow \
+		-Wno-shift-op-parentheses \
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \

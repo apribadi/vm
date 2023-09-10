@@ -6,6 +6,7 @@ typedef int8_t S8;
 typedef int16_t S16;
 typedef int32_t S32;
 typedef int64_t S64;
+typedef __int128_t S128;
 typedef uint8_t U8;
 typedef uint16_t U16;
 typedef uint32_t U32;
@@ -35,10 +36,12 @@ static_assert(sizeof(S8) == 1);
 static_assert(sizeof(S16) == 2);
 static_assert(sizeof(S32) == 4);
 static_assert(sizeof(S64) == 8);
+static_assert(sizeof(S128) == 16);
 static_assert(sizeof(U8) == 1);
 static_assert(sizeof(U16) == 2);
 static_assert(sizeof(U32) == 4);
 static_assert(sizeof(U64) == 8);
+static_assert(sizeof(U128) == 16);
 static_assert(sizeof(L16) == 2 && alignof(L16) == 2);
 static_assert(sizeof(L32) == 4 && alignof(L32) == 4);
 static_assert(sizeof(L64) == 8 && alignof(L64) == 8);
@@ -115,4 +118,16 @@ static inline U64 clz64(U64 x) {
 
 static inline U64 ctz64(U64 x) {
   return x ? (U64) __builtin_ctzll(x) : 64;
+}
+
+static inline U64 popcount64(U64 x) {
+  return (U64) __builtin_popcountll(x);
+}
+
+static inline U64 rol64(U64 x, U8 y) {
+  return __builtin_rotateleft64(x, y);
+}
+
+static inline U64 ror64(U64 x, U8 y) {
+  return __builtin_rotateright64(x, y);
 }
