@@ -18,10 +18,10 @@ typedef enum ThreadResult : U8 {
   THREAD_RESULT_ABORT,
 } ThreadResult;
 
-struct Dom;
+struct Env;
 
-typedef ThreadResult (* OpF)(
-  struct Dom *,
+typedef ThreadResult (* OpHandler)(
+  struct Env *,
   U64 *,
   U64 *,
   U64 *,
@@ -29,12 +29,12 @@ typedef ThreadResult (* OpF)(
   U64
 );
 
-typedef struct Dom {
-  OpF ops[OP_COUNT];
-} Dom;
+typedef struct Env {
+  OpHandler dispatch[OP_COUNT];
+} Env;
 
 static inline ThreadResult dispatch(
-    Dom * dp,
+    Env * ep,
     U64 * fp,
     U64 * vp,
     U64 * sp,
@@ -42,22 +42,105 @@ static inline ThreadResult dispatch(
     U64
 ) {
   U64 ic = PEEK_LE(U64, ip ++);
-  TAIL return dp->ops[H0(ic)](dp, fp, vp, sp, ip, ic);
+  TAIL return ep->dispatch[H0(ic)](ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_abort(Dom *, U64 *, U64 *, U64 *, L64 *, U64) {
+static ThreadResult op_abort(Env *, U64 *, U64 *, U64 *, L64 *, U64) {
   return THREAD_RESULT_ABORT;
 }
 
-static ThreadResult op_branch(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  // H0     | H1     | H2     | H3
-  // BRANCH | pred   | dst1   | dst2
+static ThreadResult op_call(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  // | H0              | H1              | H2              | H3              |
+  // |                 |                 |                 |                 |
+  // | CALL            | # args | # kont |              dst disp             |
+  // | kont 0          | kont 1          |                 |                 |
+  // | arg 0           | arg 1           | arg 2           | arg 3           |
+  // |                 |                 |                 |                 |
+  // | ENTER           | # args | # kont | frame size      |                 |
+  // | type 0          | type 1          | type 2          | type 3          |
+  // |                 |                 |                 |                 |
+  // | RET             | # args | kont   |                 |                 |
+  // | arg 0           | arg 1           | arg 2           | arg 3           |
+  // |                 |                 |                 |                 |
+  // | LABEL           | # args          | next var        |                 |
+  // | type 0          | type 1          | type 2          | type 3          |
+
+  // sp1 --> +-----+
+  //         |     |  5
+  //         |     |
+  //         |     |  4
+  // fp1 --> +-----+
+  //         | ret |  3
+  //         |     |
+  //         | fp0 |  2
+  // sp0 --> +-----+
+  //         |     |  1
+  //         |     |
+  //         |     |  0
+  // fp0 --> +-----+
+
+  U64 * fp0 = fp;
+  U64 * sp0 = sp;
+  L64 * ip0 = ip;
+  U64 ic0 = ic;
+
+  L64 * ip1 = ip0 + (S32) W1(ic0) - 1;
+  U64 ic1 = PEEK_LE(U64, ip1 ++);
+  U64 * fp1 = sp0 + 2;
+  U64 * vp1 = fp1;
+  U64 * sp1 = fp1 + H2(ic1);
+
+  // TODO: stack overflow check (w/ red zone)
+
+  POKE(U64 *, sp0, fp0);
+  POKE(L64 *, sp0 + 1, ip0 - 1);
+
+  U8 an = B2(ic0); // argument number
+  U8 kn = B3(ic0); // kontinuation number
+
+  assert(H0(ic1) == OP_ENTER);
+  assert(B2(ic1) == an);
+  assert(B3(ic1) == kn);
+
+  // skip kontinuations
+
+  ip0 += ((U32) kn + 3) / 4;
+
+  // pass args
+
+  if (an) {
+    for (;;) {
+      U64 av = PEEK_LE(U64, ip0 ++); // argument variables
+      ip1 ++;
+
+      // TODO: if some variable has vector type, jump to a slow path handler
+      // and redo the whole thing.
+
+      * vp1 ++ = fp0[H0(av)]; if (! -- an) break;
+      * vp1 ++ = fp0[H1(av)]; if (! -- an) break;
+      * vp1 ++ = fp0[H2(av)]; if (! -- an) break;
+      * vp1 ++ = fp0[H3(av)]; if (! -- an) break;
+   }
+  }
+
+  fp = fp1;
+  vp = vp1;
+  sp = sp1;
+  ip = ip1;
+  ic = ic1;
+
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_if(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  // | H0              | H1              | H2              | H3              |
+  // |                 |                 |                 |                 |
+  // | IF              | pred            | dst disp 0      | dst disp 0      |
+  // |                 |                 |                 |                 |
+  // | LABEL           | # args (= 0)    | next var        |                 |
 
   Bool p = PEEK(Bool, fp + H1(ic));
   S16 k = p ? (S16) H2(ic) : (S16) H3(ic);
-
-  // H0     | H1     | H2     | H3
-  // LABEL  | # args | varidx |
 
   ip = ip - 1 + k;
   ic = PEEK_LE(U64, ip ++);
@@ -66,16 +149,17 @@ static ThreadResult op_branch(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, 
   assert(H0(ic) == OP_LABEL);
   assert(H1(ic) == 0);
 
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_exit(Dom *, U64 *, U64 *, U64 *, L64 *, U64) {
-  return THREAD_RESULT_OK;
-}
-
-static ThreadResult op_jump(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  // H0     | H1     | H2     | H3
-  // opcode | # args | offset | unused
+static ThreadResult op_jump(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  // | H0              | H1              | H2              | H3              |
+  // |                 |                 |                 |                 |
+  // | JUMP            | # args          | dst disp        |                 |
+  // | arg 0           | arg 1           | arg 2           | arg 3           |
+  // |                 |                 |                 |                 |
+  // | LABEL           | # args          | next var        |                 |
+  // | type 0          | type 1          | type 2          | type 3          |
 
   U16 n = H1(ic);
   S16 k = (S16) H2(ic);
@@ -94,13 +178,13 @@ static ThreadResult op_jump(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U6
     U64 * cp = sp;
 
     for (;;) {
-      U64 x = PEEK_LE(U64, ap ++);
+      U64 av = PEEK_LE(U64, ap ++); // argument variables
       ip ++;
 
-      * bp ++ = fp[H0(x)]; if (! -- n) break;
-      * bp ++ = fp[H1(x)]; if (! -- n) break;
-      * bp ++ = fp[H2(x)]; if (! -- n) break;
-      * bp ++ = fp[H3(x)]; if (! -- n) break;
+      * bp ++ = fp[H0(av)]; if (! -- n) break;
+      * bp ++ = fp[H1(av)]; if (! -- n) break;
+      * bp ++ = fp[H2(av)]; if (! -- n) break;
+      * bp ++ = fp[H3(av)]; if (! -- n) break;
     }
 
     while (cp != bp) {
@@ -108,93 +192,163 @@ static ThreadResult op_jump(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U6
     }
   }
 
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_nop(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+static ThreadResult op_nop(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_show_i64(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_ret(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  /*
+  U64 * fp0 = fp;
+  U64 * sp0 = sp;
+  L64 * ip0 = ip;
+  U64 ic0 = ic;
+
+  U64 * fp1 = PEEK(U64 *, fp0 - 2);
+  U64 * vp1 = fp1;
+  U64 * sp1 = fp0 - 2;
+  L64 * ip1 = PEEK(L64 *, fp0 - 1);
+
+  U8 an = B2(ic0); // argument number
+  U8 ki = B3(ic0); // kontinuation index
+
+  U64 ic1 = PEEK_LE(U64, ip1 ++);
+
+  assert(H0(ic1) == OP_CALL);
+  assert(B3(ic1) > ki);
+
+  */
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_show_i64(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   printf("%" PRIi64 "\n", x);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_const_i32(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_const_i32(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U32 x = W1(ic);
   POKE(U32, vp ++, x);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_const_i64(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_const_i64(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK_LE(U64, ip ++);
   POKE(U64, vp ++, x);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_f32_add(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_f32_add(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   F32 x = PEEK(F32, fp + H1(ic));
   F32 y = PEEK(F32, fp + H2(ic));
-  F32 z = x + y;
-  POKE(F32, vp ++, z);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(F32, vp ++, x + y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_f32_sqrt(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_f32_sqrt(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   F32 x = PEEK(F32, fp + H1(ic));
-  F32 y = sqrtf(x);
-  POKE(F32, vp ++, y);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(F32, vp ++, sqrtf(x));
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_f64_add(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_f64_add(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   F64 x = PEEK(F64, fp + H1(ic));
   F64 y = PEEK(F64, fp + H2(ic));
-  F64 z = x + y;
-  POKE(F64, vp ++, z);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(F64, vp ++, x + y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_f64_sqrt(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_f64_sqrt(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   F64 x = PEEK(F64, fp + H1(ic));
-  F64 y = sqrt(x);
-  POKE(F64, vp ++, y);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(F64, vp ++, sqrt(x));
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_i32_add(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_i32_add(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U32 x = PEEK(U32, fp + H1(ic));
   U32 y = PEEK(U32, fp + H2(ic));
-  U32 z = x + y;
-  POKE(U32, vp ++, z);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(U32, vp ++, x + y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_i64_add(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_i64_add(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
-  U64 z = x + y;
-  POKE(U64, vp ++, z);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(U64, vp ++, x + y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_i64_is_eq(Dom * dp, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_i64_bit_and(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
-  Bool z = x == y;
-  POKE(Bool, vp ++, z);
-  TAIL return dispatch(dp, fp, vp, sp, ip, ic);
+  POKE(U64, vp ++, x & y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_bit_not(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  POKE(U64, vp ++, ~ x);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_bit_or(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  U64 y = PEEK(U64, fp + H2(ic));
+  POKE(U64, vp ++, x | y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_bit_xor(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  U64 y = PEEK(U64, fp + H2(ic));
+  POKE(U64, vp ++, x ^ y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_byteswap(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  POKE(U64, vp ++, bswap64(x));
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_clz(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  POKE(U64, vp ++, clz64(x));
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_ctz(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  POKE(U64, vp ++, ctz64(x));
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_is_eq(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  U64 y = PEEK(U64, fp + H2(ic));
+  POKE(Bool, vp ++, x == y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
+static ThreadResult op_i64_mul(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  U64 y = PEEK(U64, fp + H2(ic));
+  POKE(U64, vp ++, x * y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
 static ThreadResult interpret(L64 * ip) {
-  Dom dom = {
-    .ops = {
+  Env dom = {
+    .dispatch = {
       [OP_ABORT] = op_abort,
-      [OP_BRANCH] = op_branch,
-      [OP_EXIT] = op_exit,
+      [OP_CALL] = op_call,
+      [OP_IF] = op_if,
       [OP_JUMP] = op_jump,
       [OP_NOP] = op_nop,
+      [OP_RET] = op_ret,
       [OP_SHOW_I64] = op_show_i64,
       [OP_CONST_F32] = op_const_i32, // same as OP_CONST_I32
       [OP_CONST_F64] = op_const_i64, // same as OP_CONST_I64
@@ -206,7 +360,15 @@ static ThreadResult interpret(L64 * ip) {
       [OP_F64_SQRT] = op_f64_sqrt,
       [OP_I32_ADD] = op_i32_add,
       [OP_I64_ADD] = op_i64_add,
+      [OP_I64_BIT_AND] = op_i64_bit_and,
+      [OP_I64_BIT_NOT] = op_i64_bit_not,
+      [OP_I64_BIT_OR] = op_i64_bit_or,
+      [OP_I64_BIT_XOR] = op_i64_bit_xor,
+      [OP_I64_BYTESWAP] = op_i64_byteswap,
+      [OP_I64_CLZ] = op_i64_clz,
+      [OP_I64_CTZ] = op_i64_ctz,
       [OP_I64_IS_EQ] = op_i64_is_eq,
+      [OP_I64_MUL] = op_i64_mul,
     },
   };
 
@@ -222,10 +384,10 @@ int main(int, char **) {
     /*  2 1 */ ic_make_h___(OP_CONST_I64),
     /*  3   */ ic_make_d___(0),
     /*  4 2 */ ic_make_hhh_(OP_I64_IS_EQ, 0, 1),
-    /*  5   */ ic_make_hhhh(OP_BRANCH, 2, 1, 4),
+    /*  5   */ ic_make_hhhh(OP_IF, 2, 1, 4),
     /*  6   */ ic_make_hhh_(OP_LABEL, 0, 3),
     /*  7   */ ic_make_hh__(OP_SHOW_I64, 1),
-    /*  8   */ ic_make_h___(OP_EXIT),
+    /*  8   */ ic_make_h___(OP_ABORT),
     /*  9   */ ic_make_hhh_(OP_LABEL, 0, 3),
     /* 10 3 */ ic_make_h___(OP_CONST_I64),
     /* 11   */ ic_make_d___(1),
@@ -234,7 +396,7 @@ int main(int, char **) {
     /* 14 4 */ ic_make_hhh_(OP_LABEL, 3, 4),
     /* 15   */ ic_make_hhh_(TY_I64, TY_I64, TY_I64),
     /* 16 7 */ ic_make_hhh_(OP_I64_IS_EQ, 4, 0),
-    /* 17   */ ic_make_hhhh(OP_BRANCH, 7, 6, 1),
+    /* 17   */ ic_make_hhhh(OP_IF, 7, 6, 1),
     /* 18   */ ic_make_hhh_(OP_LABEL, 0, 8),
     /* 19 8 */ ic_make_hhh_(OP_I64_ADD, 5, 6),
     /* 20 9 */ ic_make_hhh_(OP_I64_ADD, 4, 3),
@@ -242,7 +404,7 @@ int main(int, char **) {
     /* 22   */ ic_make_hhh_(9, 6, 8),
     /* 23   */ ic_make_hhh_(OP_LABEL, 0, 10),
     /* 24   */ ic_make_hh__(OP_SHOW_I64, 6),
-    /* 25   */ ic_make_h___(OP_EXIT),
+    /* 25   */ ic_make_h___(OP_ABORT),
   };
 
   disassemble(code, code + sizeof(code) / sizeof(L64));

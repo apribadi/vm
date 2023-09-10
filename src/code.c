@@ -1,12 +1,13 @@
-typedef enum Op : U16 {
+typedef enum OpCode : U16 {
   OP_ABORT,
-  OP_BRANCH,
   OP_CALL,
   OP_CALL_INDIRECT,
   OP_CALL_INDIRECT_TAIL,
   OP_CALL_TAIL,
+  OP_CASE,
   OP_ENTER,
   OP_EXIT,
+  OP_IF,
   OP_JUMP,
   OP_LABEL,
   OP_NOP,
@@ -86,10 +87,6 @@ typedef enum Op : U16 {
   OP_I32_MIN_S,
   OP_I32_MIN_U,
   OP_I32_MUL,
-  OP_I32_MUL_FULL_S,
-  OP_I32_MUL_FULL_U,
-  OP_I32_MUL_HI_S,
-  OP_I32_MUL_HI_U,
   OP_I32_NEG,
   OP_I32_POPCOUNT,
   OP_I32_ROL,
@@ -145,9 +142,9 @@ typedef enum Op : U16 {
   OP_I64_TO_I5,
   OP_I64_TO_I6,
   OP_COUNT,
-} Op;
+} OpCode;
 
-typedef enum Ty : U8 {
+typedef enum TyCode : U8 {
   TY_BOOL,
   TY_F32,
   TY_F64,
@@ -156,7 +153,7 @@ typedef enum Ty : U8 {
   TY_I6,
   TY_I64,
   TY_V256,
-} Ty;
+} TyCode;
 
 static inline L64 ic_make_hhhh(U16 h0, U16 h1, U16 h2, U16 h3) {
   U64 x =

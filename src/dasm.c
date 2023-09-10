@@ -1,7 +1,7 @@
 static char * op_name(U16 x) {
   switch (x) {
       case OP_ABORT: return "OP_ABORT";
-      case OP_BRANCH: return "OP_BRANCH";
+      case OP_IF: return "OP_IF";
       case OP_EXIT: return "OP_EXIT";
       case OP_JUMP: return "OP_JUMP";
       case OP_LABEL: return "OP_LABEL";
@@ -21,7 +21,7 @@ static void disassemble(L64 * ip, L64 * stop) {
     printf("0x%016" PRIx64 " %s", ic, op_name(H0(ic)));
 
     switch (H0(ic)) {
-      case OP_BRANCH:
+      case OP_IF:
         printf(" x%d ? jump %+d : jump %+d\n", H1(ic), (S16) H2(ic), (S16) H3(ic));
         break;
       case OP_JUMP: {
