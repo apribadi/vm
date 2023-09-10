@@ -120,10 +120,6 @@ static inline U64 ctz64(U64 x) {
   return x ? (U64) __builtin_ctzll(x) : 64;
 }
 
-static inline U64 popcount64(U64 x) {
-  return (U64) __builtin_popcountll(x);
-}
-
 static inline U64 rol64(U64 x, U8 y) {
   return __builtin_rotateleft64(x, y);
 }

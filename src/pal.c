@@ -308,12 +308,6 @@ static ThreadResult op_i64_bit_xor(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 *
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_i64_byteswap(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  U64 x = PEEK(U64, fp + H1(ic));
-  POKE(U64, vp ++, bswap64(x));
-  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
-}
-
 static ThreadResult op_i64_clz(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U64, vp ++, clz64(x));
@@ -330,34 +324,6 @@ static ThreadResult op_i64_is_eq(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * i
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(Bool, vp ++, x == y);
-  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
-}
-
-static ThreadResult op_i64_is_ge_s(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  S64 x = PEEK(S64, fp + H1(ic));
-  S64 y = PEEK(S64, fp + H2(ic));
-  POKE(Bool, vp ++, x >= y);
-  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
-}
-
-static ThreadResult op_i64_is_ge_u(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  U64 x = PEEK(U64, fp + H1(ic));
-  U64 y = PEEK(U64, fp + H2(ic));
-  POKE(Bool, vp ++, x >= y);
-  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
-}
-
-static ThreadResult op_i64_is_gt_s(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  S64 x = PEEK(S64, fp + H1(ic));
-  S64 y = PEEK(S64, fp + H2(ic));
-  POKE(Bool, vp ++, x > y);
-  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
-}
-
-static ThreadResult op_i64_is_gt_u(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  U64 x = PEEK(U64, fp + H1(ic));
-  U64 y = PEEK(U64, fp + H2(ic));
-  POKE(Bool, vp ++, x > y);
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
@@ -386,13 +352,6 @@ static ThreadResult op_i64_is_lt_u(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 *
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(Bool, vp ++, x < y);
-  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
-}
-
-static ThreadResult op_i64_is_ne(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  U64 x = PEEK(U64, fp + H1(ic));
-  U64 y = PEEK(U64, fp + H2(ic));
-  POKE(Bool, vp ++, x != y);
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
@@ -443,6 +402,12 @@ static ThreadResult op_i64_neg(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip,
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
+static ThreadResult op_i64_rev(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  U64 x = PEEK(U64, fp + H1(ic));
+  POKE(U64, vp ++, bswap64(x));
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
 static ThreadResult op_i64_rol(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic)) & 0x3f;
@@ -457,6 +422,14 @@ static ThreadResult op_i64_ror(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip,
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
+static ThreadResult op_i64_select(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+  Bool p = PEEK(Bool, fp + H1(ic));
+  U64 x = PEEK(U64, fp + H2(ic));
+  U64 y = PEEK(U64, fp + H3(ic));
+  POKE(U64, vp ++, p ? x : y);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
+}
+
 static ThreadResult op_i64_shl(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic)) & 0x3f;
@@ -465,9 +438,9 @@ static ThreadResult op_i64_shl(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip,
 }
 
 static ThreadResult op_i64_shr_s(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
-  S64 x = (S64) PEEK(U64, fp + H1(ic));
+  S64 x = PEEK(S64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic)) & 0x3f;
-  POKE(U64, vp ++, (U64) (x >> y));
+  POKE(S64, vp ++, x >> y);
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
@@ -485,9 +458,10 @@ static ThreadResult op_i64_sub(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip,
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
-static ThreadResult op_i64_to_f64_bits(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
+static ThreadResult op_i64_to_f64_bitcast(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
-  POKE(F64, vp ++, PEEK(F64, &x));
+  F64 y = PEEK(F64, &x);
+  POKE(F64, vp ++, y);
   TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
@@ -539,32 +513,28 @@ static ThreadResult interpret(L64 * ip) {
       [OP_I64_BIT_NOT] = op_i64_bit_not,
       [OP_I64_BIT_OR] = op_i64_bit_or,
       [OP_I64_BIT_XOR] = op_i64_bit_xor,
-      [OP_I64_BYTESWAP] = op_i64_byteswap,
       [OP_I64_CLZ] = op_i64_clz,
       [OP_I64_CTZ] = op_i64_ctz,
       [OP_I64_IS_EQ] = op_i64_is_eq,
-      [OP_I64_IS_GE_S] = op_i64_is_ge_s,
-      [OP_I64_IS_GE_U] = op_i64_is_ge_u,
-      [OP_I64_IS_GT_S] = op_i64_is_gt_s,
-      [OP_I64_IS_GT_U] = op_i64_is_gt_u,
       [OP_I64_IS_LE_S] = op_i64_is_le_s,
       [OP_I64_IS_LE_U] = op_i64_is_le_u,
       [OP_I64_IS_LT_S] = op_i64_is_lt_s,
       [OP_I64_IS_LT_U] = op_i64_is_lt_u,
-      [OP_I64_IS_NE] = op_i64_is_ne,
       [OP_I64_MUL] = op_i64_mul,
       [OP_I64_MUL_FULL_S] = op_i64_mul_full_s,
       [OP_I64_MUL_FULL_U] = op_i64_mul_full_u,
       [OP_I64_MUL_HI_S] = op_i64_mul_hi_s,
       [OP_I64_MUL_HI_U] = op_i64_mul_hi_u,
       [OP_I64_NEG] = op_i64_neg,
+      [OP_I64_REV] = op_i64_rev,
       [OP_I64_ROL] = op_i64_rol,
       [OP_I64_ROR] = op_i64_ror,
+      [OP_I64_SELECT] = op_i64_select,
       [OP_I64_SHL] = op_i64_shl,
       [OP_I64_SHR_S] = op_i64_shr_s,
       [OP_I64_SHR_U] = op_i64_shr_u,
       [OP_I64_SUB] = op_i64_sub,
-      [OP_I64_TO_F64_BITS] = op_i64_to_f64_bits,
+      [OP_I64_TO_F64_BITCAST] = op_i64_to_f64_bitcast,
       [OP_I64_TO_I32] = op_i64_to_i32,
       [OP_I64_TO_I32_HI] = op_i64_to_i32_hi,
       [OP_I64_TO_I5] = op_i64_to_i5,

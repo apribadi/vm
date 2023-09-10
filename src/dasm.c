@@ -2,7 +2,6 @@ static char * op_name(U16 x) {
   switch (x) {
       case OP_ABORT: return "OP_ABORT";
       case OP_IF: return "OP_IF";
-      case OP_EXIT: return "OP_EXIT";
       case OP_JUMP: return "OP_JUMP";
       case OP_LABEL: return "OP_LABEL";
       case OP_SHOW_I64: return "OP_SHOW_I64";
