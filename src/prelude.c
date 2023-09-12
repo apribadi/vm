@@ -1,5 +1,4 @@
 typedef bool Bool;
-typedef unsigned char Byte;
 typedef float F32;
 typedef double F64;
 typedef int8_t S8;
@@ -29,7 +28,6 @@ typedef union L64 {
 } L64;
 
 static_assert(sizeof(Bool) == 1);
-static_assert(sizeof(Byte) == 1);
 static_assert(sizeof(F32) == 4);
 static_assert(sizeof(F64) == 8);
 static_assert(sizeof(S8) == 1);
@@ -108,22 +106,34 @@ static inline U8 B3(U64 x) {
   return (U8) (x >> 24);
 }
 
-static inline U64 bswap64(U64 x) {
+static inline int clz64(U64 x) {
+  return x ? __builtin_clzll(x) : 64;
+}
+
+static inline int ctz64(U64 x) {
+  return x ? __builtin_ctzll(x) : 64;
+}
+
+static inline U64 rev64(U64 x) {
   return __builtin_bswap64(x);
 }
 
-static inline U64 clz64(U64 x) {
-  return x ? (U64) __builtin_clzll(x) : 64;
+static inline U64 rol64(U64 x, int k) {
+  return x << (k & 0x3f) | x >> (- (unsigned int) k & 0x3f);
 }
 
-static inline U64 ctz64(U64 x) {
-  return x ? (U64) __builtin_ctzll(x) : 64;
+static inline U64 ror64(U64 x, int k) {
+  return x >> (k & 0x3f) | x << (- (unsigned int) k & 0x3f);
 }
 
-static inline U64 rol64(U64 x, U8 y) {
-  return __builtin_rotateleft64(x, y);
+static inline U64 shl64(U64 x, int k) {
+  return x << (k & 0x3f);
 }
 
-static inline U64 ror64(U64 x, U8 y) {
-  return __builtin_rotateright64(x, y);
+static inline S64 asr64(S64 x, int k) {
+  return x >> (k & 0x3f);
+}
+
+static inline U64 lsr64(U64 x, int k) {
+  return x >> (k & 0x3f);
 }
