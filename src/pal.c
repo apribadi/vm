@@ -90,23 +90,23 @@ static ThreadResult op_call(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U6
   U64 * fp0 = fp;
   U64 * sp0 = sp;
 
-  L64 * ip1 = ip0 - 1 + (S32) W1(ic0);
-  U64 ic1 = PEEK_LE(U64, ip1 ++);
-  U64 * fp1 = sp0;
-  U64 * vp1 = sp0;
-  U64 * sp1 = sp0 + H2(ic1) + 2;
-
-  // TODO: stack overflow check (w/ red zone)
-
-  POKE(U64 *, sp0 - 2, fp0);
-  POKE(L64 *, sp0 - 1, ip0 - 1);
-
   U8 an = B2(ic0);  // # arguments
   U8 kn = B3(ic0);  // # kontinuations
 
-  assert(H0(ic1) == OP_ENTER);
-  assert(B2(ic1) == an);
-  assert(B3(ic1) == kn);
+  ip = ip0 - 1 + (S32) W1(ic0);
+  ic = PEEK_LE(U64, ip ++);
+  fp = sp0;
+  vp = sp0;
+  sp = sp0 + H2(ic) + 2;
+
+  // TODO: stack overflow check (w/ red zone)
+
+  POKE(U64 *, fp - 2, fp0);
+  POKE(L64 *, fp - 1, ip0 - 1);
+
+  assert(H0(ic) == OP_ENTER);
+  assert(B2(ic) == an);
+  assert(B3(ic) == kn);
 
   // skip kontinuations
 
@@ -117,19 +117,19 @@ static ThreadResult op_call(Env * ep, U64 * fp, U64 * vp, U64 * sp, L64 * ip, U6
   if (an) {
     for (;;) {
       U64 av = PEEK_LE(U64, ip0 ++); // argument variables
-      ip1 ++;
+      ip ++;
 
       // TODO: if some variable has vector type, jump to a slow path handler
       // and redo the whole thing.
 
-      * vp1 ++ = fp0[H0(av)]; if (! -- an) break;
-      * vp1 ++ = fp0[H1(av)]; if (! -- an) break;
-      * vp1 ++ = fp0[H2(av)]; if (! -- an) break;
-      * vp1 ++ = fp0[H3(av)]; if (! -- an) break;
+      * vp ++ = fp0[H0(av)]; if (! -- an) break;
+      * vp ++ = fp0[H1(av)]; if (! -- an) break;
+      * vp ++ = fp0[H2(av)]; if (! -- an) break;
+      * vp ++ = fp0[H3(av)]; if (! -- an) break;
    }
   }
 
-  TAIL return dispatch(ep, fp1, vp1, sp1, ip1, ic1);
+  TAIL return dispatch(ep, fp, vp, sp, ip, ic);
 }
 
 static ThreadResult op_exit(Env *, U64 *, U64 *, U64 *, L64 *, U64) {
