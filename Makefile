@@ -26,6 +26,7 @@ pal: src/*.c
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
+		-fno-slp-vectorize \
 		-pedantic \
 		-Weverything \
 		-Wno-declaration-after-statement \
@@ -51,6 +52,7 @@ pal-debug: src/*.c
 		-ffp-contract=off \
 		-fno-math-errno \
 		-fno-omit-frame-pointer \
+		-fno-slp-vectorize \
 		-pedantic \
 		-Weverything \
 		-Wno-declaration-after-statement \

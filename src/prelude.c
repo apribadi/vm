@@ -98,6 +98,10 @@ static inline U16 H3(U64 x) {
   return (U16) (x >> 48);
 }
 
+static inline U16 HI(U64 x, int i) {
+  return (U16) (x >> 16 * i);
+}
+
 static inline U8 B2(U64 x) {
   return (U8) (x >> 16);
 }

@@ -45,7 +45,13 @@ static inline ThreadResult dispatch(
   TAIL return ep->dispatch[H0(ic)](ep, ip, fp, vp, sp, ic);
 }
 
-static ThreadResult op_abort(Env *, L64 *, U64 *, U64 *, U64 *, U64 ic) {
+static ThreadResult op_abort(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+  (void) ep;
+  (void) ip;
+  (void) fp;
+  (void) vp;
+  (void) sp;
+
   return W1(ic);
 }
 
@@ -53,11 +59,11 @@ static ThreadResult op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U6
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
   // | CALL            | # args | # kont |              dst disp             |
-  // | kont disp 0     | kont disp 1     |                 |                 |
   // | arg 0           | arg 1           | arg 2           | arg 3           |
+  // | kont disp 0     | kont disp 1     |                 |                 |
   // |                 |                 |                 |                 |
   // | ENTER           | # args | # kont | frame size      |                 |
-  // | type 0          | type 1          | type 2          | type 3          |
+  // | arg type 0      | arg type 1      | arg type 2      | arg type 3      |
   // |                 |                 |                 |                 |
   // | RET             | # args | kont   |                 |                 |
   // | arg 0           | arg 1           | arg 2           | arg 3           |
@@ -83,44 +89,42 @@ static ThreadResult op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U6
   //                 |     |  0
   // fp0 ----------> +-----+
 
-  (void) vp;
-
   L64 * ip0 = ip;
-  U64 ic0 = ic;
   U64 * fp0 = fp;
   U64 * sp0 = sp;
 
-  U8 an = B2(ic0);  // # arguments
-  U8 kn = B3(ic0);  // # kontinuations
+  U16 an = (U16) B2(ic); // # arguments
+  U16 kn = (U16) B3(ic); // # kontinuations
+  S32 di = (S32) W1(ic); // target displacement
 
-  ip = ip0 - 1 + (S32) W1(ic0);
+  (void) vp;
+  (void) kn;
+
+  // store frame pointer and return address
+
+  POKE(U64 *, sp0 - 2, fp0);
+  POKE(L64 *, sp0 - 1, ip0 - 1);
+
+  // enter function, make new stack frame
+
+  ip = ip0 - 1 + di;
   ic = PEEK_LE(U64, ip ++);
   fp = sp0;
   vp = sp0;
   sp = sp0 + H2(ic) + 2;
 
-  // TODO: stack overflow check (w/ red zone)
-
-  POKE(U64 *, fp - 2, fp0);
-  POKE(L64 *, fp - 1, ip0 - 1);
-
   assert(H0(ic) == OP_ENTER);
   assert(B2(ic) == an);
   assert(B3(ic) == kn);
 
-  // skip kontinuations
+  // TODO: stack overflow check
 
-  ip0 += ((unsigned int) kn + 3) / 4;
-
-  // pass args
+  // copy args
 
   if (an) {
-    for (;;) {
-      U64 av = PEEK_LE(U64, ip0 ++); // argument variables
+    while (true) {
+      U64 av = PEEK_LE(U64, ip0 ++);
       ip ++;
-
-      // TODO: if some variable has vector type, jump to a slow path handler
-      // and redo the whole thing.
 
       * vp ++ = fp0[H0(av)]; if (! -- an) break;
       * vp ++ = fp0[H1(av)]; if (! -- an) break;
@@ -140,9 +144,9 @@ static ThreadResult op_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 
   // | LABEL           | # args (= 0)    | next var        |                 |
 
   Bool p = PEEK(Bool, fp + H1(ic));
-  S16 k = p ? (S16) H2(ic) : (S16) H3(ic);
+  S16 di = p ? (S16) H2(ic) : (S16) H3(ic);
 
-  ip = ip - 1 + k;
+  ip = ip - 1 + di;
   ic = PEEK_LE(U64, ip ++);
   vp = fp + H2(ic);
 
@@ -161,34 +165,40 @@ static ThreadResult op_jump(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U6
   // | LABEL           | # args          | next var        |                 |
   // | type 0          | type 1          | type 2          | type 3          |
 
-  U16 n = H1(ic);
-  S16 k = (S16) H2(ic);
+  L64 * ip0 = ip;
 
-  L64 * ap = ip;
+  U16 an = H1(ic);
+  S16 di = (S16) H2(ic);
 
-  ip = ip - 1 + k;
+  ip = ip - 1 + di;
   ic = PEEK_LE(U64, ip ++);
   vp = fp + H2(ic);
 
   assert(H0(ic) == OP_LABEL);
-  assert(H1(ic) == n);
+  assert(H1(ic) == an);
 
-  if (n) {
-    U64 * bp = sp; // RED ZONE
-    U64 * cp = sp;
+  if (an) {
+    // TODO: stack overflow check
 
-    for (;;) {
-      U64 av = PEEK_LE(U64, ap ++); // argument variables
+    U64 * p = sp;
+    U64 * q = sp;
+
+    // copy args into scratch space
+
+    while (true) {
+      U64 av = PEEK_LE(U64, ip0 ++);
       ip ++;
 
-      * bp ++ = fp[H0(av)]; if (! -- n) break;
-      * bp ++ = fp[H1(av)]; if (! -- n) break;
-      * bp ++ = fp[H2(av)]; if (! -- n) break;
-      * bp ++ = fp[H3(av)]; if (! -- n) break;
+      * p ++ = fp[H0(av)]; if (! -- an) break;
+      * p ++ = fp[H1(av)]; if (! -- an) break;
+      * p ++ = fp[H2(av)]; if (! -- an) break;
+      * p ++ = fp[H3(av)]; if (! -- an) break;
     }
 
-    while (cp != bp) {
-      * vp ++ = * cp ++;
+    // copy args from scratch space
+
+    while (q != p) {
+      * vp ++ = * q ++;
     }
   }
 
@@ -200,41 +210,39 @@ static ThreadResult op_nop(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64
 }
 
 static ThreadResult op_ret(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
-  (void) vp;
-
   L64 * ip0 = ip;
-  U64 ic0 = ic;
   U64 * fp0 = fp;
 
-  ip = PEEK(L64 *, fp0 - 1);
+  U16 an = (U16) B2(ic);
+  U16 ki = (U16) B3(ic);
+
   fp = PEEK(U64 *, fp0 - 2);
+  ip = PEEK(L64 *, fp0 - 1);
   sp = fp0;
-
-  U8 an = B2(ic0);
-  U8 ki = B3(ic0);
-
   ic = PEEK_LE(U64, ip ++);
 
   assert(H0(ic) == OP_CALL);
   assert(B3(ic) > ki);
 
-  L64 * ip1 = ip;
+  S16 di = (S16) HI(PEEK_LE(U64, ip + (B2(ic) + 3) / 4 + ki / 4), ki & 3);
 
-  ic = PEEK_LE(U64, ip ++); // konts
-
-  (void) ip0;
-  (void) an;
-  (void) ki;
-
-  U16 di = H0(ic); // TODO: select continuation by index
-
-  ip = ip1 - 1 + di;
+  ip = ip - 1 + di;
   ic = PEEK_LE(U64, ip ++);
   vp = fp + H2(ic);
 
-  assert(H1(ic) == (U16) an);
+  assert(H1(ic) == an);
 
-  // TODO: move args
+  if (an) {
+    while (true) {
+      U64 av = PEEK_LE(U64, ip0 ++);
+      ip ++;
+
+      * vp ++ = fp0[H0(av)]; if (! -- an) break;
+      * vp ++ = fp0[H1(av)]; if (! -- an) break;
+      * vp ++ = fp0[H2(av)]; if (! -- an) break;
+      * vp ++ = fp0[H3(av)]; if (! -- an) break;
+   }
+  }
 
   TAIL return dispatch(ep, ip, fp, vp, sp, ic);
 }
