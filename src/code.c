@@ -117,7 +117,7 @@ typedef enum OpCode : U16 {
   OP_COUNT,
 } OpCode;
 
-typedef enum TyCode : U8 {
+typedef enum TyCode : U16 {
   TY_BOOL,
   TY_F32,
   TY_F64,
