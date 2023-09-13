@@ -28,6 +28,7 @@ static void disassemble(L64 * start, L64 * stop) {
   L64 * q = start;
   int v = 0;
   int n;
+  int m;
   int i;
   int k;
 
@@ -39,6 +40,24 @@ static void disassemble(L64 * start, L64 * stop) {
     printf(" ");
 
     switch (H0(ic)) {
+      case OP_CALL:
+        printf("  call %+d (", W1(ic));
+        n = B2(ic);
+        m = B3(ic);
+        for (i = 0; i < n; ++ i) {
+          k = i & 3;
+          if (k == 0) { ic = PEEK_LE(U64, p ++); }
+          if (i != 0) { printf(", "); }
+          printf("%%%d", HI(ic, k));
+        }
+        printf(") ->");
+        for (i = 0; i < m; ++ i) {
+          k = i & 3;
+          if (k == 0) { ic = PEEK_LE(U64, p ++); }
+          printf(" %+d", (S16) HI(ic, k));
+        }
+        printf("\n");
+        break;
       case OP_ENTER:
         v = 0;
         printf("enter (");
