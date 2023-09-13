@@ -611,16 +611,25 @@ static ThreadResult interpret(L64 * ip) {
 
 int main(int, char **) {
   L64 code[] = {
-    /*   */ ic_make_hbh_(OP_ENTER, 0, 1, 10),
+    /*   */ ic_make_hbh_(OP_ENTER, 0, 1, 2),
     /* 0 */ ic_make_h___(OP_CONST_I64),
     /*   */ ic_make_d___(10),
+    /*   */ ic_make_hbw_(OP_CALL, 1, 1, 7),
+    /*   */ ic_make_h___(0),
+    /*   */ ic_make_h___(3),
+    /* 1 */ ic_make_hhh_(OP_LABEL, 1, 1),
+    /*   */ ic_make_h___(TY_I64),
+    /*   */ ic_make_hh__(OP_SHOW_I64, 1),
+    /*   */ ic_make_hb__(OP_RET, 0, 0),
+    /* 0 */ ic_make_hbh_(OP_ENTER, 1, 1, 10),
+    /*   */ ic_make_h___(TY_I64),
     /* 1 */ ic_make_h___(OP_CONST_I64),
     /*   */ ic_make_d___(0),
     /* 2 */ ic_make_hhh_(OP_I64_IS_EQ, 0, 1),
     /*   */ ic_make_hhhh(OP_IF, 2, 1, 4),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 3),
-    /*   */ ic_make_hh__(OP_SHOW_I64, 1),
-    /*   */ ic_make_hb__(OP_RET, 0, 0),
+    /*   */ ic_make_hb__(OP_RET, 1, 0),
+    /*   */ ic_make_h___(1),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 3),
     /* 3 */ ic_make_h___(OP_CONST_I64),
     /*   */ ic_make_d___(1),
@@ -636,8 +645,8 @@ int main(int, char **) {
     /*   */ ic_make_hhh_(OP_JUMP, 3, (U16) -7),
     /*   */ ic_make_hhh_(9, 6, 8),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 10),
-    /*   */ ic_make_hh__(OP_SHOW_I64, 6),
-    /*   */ ic_make_hb__(OP_RET, 0, 0),
+    /*   */ ic_make_hb__(OP_RET, 1, 0),
+    /*   */ ic_make_h___(6),
   };
 
   disassemble(code, code + sizeof(code) / sizeof(L64));
