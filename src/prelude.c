@@ -1,3 +1,9 @@
+#ifdef NDEBUG
+#define ASSERT(X) do { (void) sizeof((X)); } while (0)
+#else
+#define ASSERT(X) assert((X))
+#endif
+
 typedef bool Bool;
 typedef float F32;
 typedef double F64;
@@ -12,20 +18,7 @@ typedef uint32_t U32;
 typedef uint64_t U64;
 typedef __uint128_t U128;
 
-typedef union L16 {
-  U16 value;
-} L16;
-
-typedef union L32 {
-  U32 value;
-  struct { L16 h0; L16 h1; };
-} L32;
-
-typedef union L64 {
-  U64 value;
-  struct { L16 h0; L16 h1; L16 h2; L16 h3; };
-  struct { L32 w0; L32 w1; };
-} L64;
+typedef struct L64 { U64 value; } L64;
 
 static_assert(sizeof(Bool) == 1);
 static_assert(sizeof(F32) == 4);
@@ -40,8 +33,6 @@ static_assert(sizeof(U16) == 2);
 static_assert(sizeof(U32) == 4);
 static_assert(sizeof(U64) == 8);
 static_assert(sizeof(U128) == 16);
-static_assert(sizeof(L16) == 2 && alignof(L16) == 2);
-static_assert(sizeof(L32) == 4 && alignof(L32) == 4);
 static_assert(sizeof(L64) == 8 && alignof(L64) == 8);
 
 #define PEEK(T, P) \

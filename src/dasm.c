@@ -72,8 +72,8 @@ static void disassemble(L64 * start, L64 * stop) {
       case OP_IF:
         printf("  if %%%d then %+d else %+d\n", H1(ic), (S16) H2(ic), (S16) H3(ic));
         break;
-      case OP_JUMP:
-        printf("  jump %+d (", (S16) H2(ic));
+      case OP_GOTO:
+        printf("  goto %+d (", (S16) H2(ic));
         n = H1(ic);
         for (i = 0; i < n; ++ i) {
           k = i & 3;
@@ -94,8 +94,8 @@ static void disassemble(L64 * start, L64 * stop) {
         }
         printf("):\n");
         break;
-      case OP_RET:
-        printf("  ret (");
+      case OP_RETURN:
+        printf("  return (");
         n = B2(ic);
         for (i = 0; i < n; ++ i) {
           k = i & 3;

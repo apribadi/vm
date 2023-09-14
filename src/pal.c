@@ -43,9 +43,7 @@ static inline ExitCode dispatch(
     U64 * sp,
     U64 zero
 ) {
-  (void) zero;
-
-  assert(zero == 0);
+  ASSERT(zero == 0);
 
   U64 ic = PEEK_LE(U64, ip ++);
   TAIL return ep->dispatch[H0(ic)](ep, ip, fp, vp, sp, ic);
@@ -76,26 +74,28 @@ static ExitCode op_abort(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 i
 static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
-  // | CALL            | # args | # kont |              dst disp             |
+  // | CALL            | # args          |              dst disp             |
   // | arg 0           | arg 1           | arg 2           | arg 3           |
-  // | kont disp 0     | kont disp 1     |                 |                 |
+  // | arg 4           | arg 5           |                 |                 |
+  // | CONTINUE        | # konts         | frame size      |                 |
+  // | kont 0          | kont 1          |                 |                 |
   // |                 |                 |                 |                 |
-  // | CALL_INDIRECT   | # args | # kont | fun ptr var     |                 |
-  // | arg 0           | arg 1           | arg 2           | arg 3           |
-  // | kont disp 0     | kont disp 1     |                 |                 |
+  // | LABEL           | # args          | next var        |                 |
+  // | type 0          | type 1          | type 2          | type 3          |
   // |                 |                 |                 |                 |
-  // | ENTER           | # args | # kont | frame size      |                 |
-  // | param type 0    | param type 1    | param type 2    | param type 3    |
-
+  // | ENTER           | # args          | frame size      | # konts         |
+  // | type 0          | type 1          | type 2          | type 3          |
+  // |                 |                 |                 |                 |
+  // | RETURN          | # args          | frame size      | kont index      |
+  // | retval 0        | retval 1        | retval 2        | retval 3        |
+  //
   //         sp1 --> +-----+
-  //                 | ooo |
   //                 | ooo |
   //                 +-----+
   //                 |     |
   //                 |     |
   // sp0 --> fp1 --> +-----+
   //                 | ret |
-  //                 | fp0 |
   //                 +-----+
   //                 |     |
   //                 |     |
@@ -127,9 +127,9 @@ static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
 
   ic = PEEK_LE(U64, ip ++);
 
-  assert(H0(ic) == OP_ENTER);
-  assert(B2(ic) == an);
-  assert(B3(ic) == kn);
+  ASSERT(H0(ic) == OP_ENTER);
+  ASSERT(B2(ic) == an);
+  ASSERT(B3(ic) == kn);
 
   // make new stack frame
 
@@ -217,9 +217,9 @@ static ExitCode op_call_tail(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U
 
   ic = PEEK_LE(U64, ip ++);
 
-  assert(H0(ic) == OP_ENTER);
-  assert(B2(ic) == an);
-  assert(B3(ic) == kn);
+  ASSERT(H0(ic) == OP_ENTER);
+  ASSERT(B2(ic) == an);
+  ASSERT(B3(ic) == kn);
 
   // make new stack frame
 
@@ -263,16 +263,16 @@ static ExitCode op_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) 
   ic = PEEK_LE(U64, ip ++);
   vp = fp + H2(ic);
 
-  assert(H0(ic) == OP_LABEL);
-  assert(H1(ic) == 0);
+  ASSERT(H0(ic) == OP_LABEL);
+  ASSERT(H1(ic) == 0);
 
   TAIL return dispatch(ep, ip, fp, vp, sp, 0);
 }
 
-static ExitCode op_jump(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode op_goto(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
-  // | JUMP            | # args          | dst disp        |                 |
+  // | GOTO            | # args          | dst disp        |                 |
   // | arg 0           | arg 1           | arg 2           | arg 3           |
   // |                 |                 |                 |                 |
   // | LABEL           | # args          | next var        |                 |
@@ -287,8 +287,8 @@ static ExitCode op_jump(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
   ic = PEEK_LE(U64, ip ++);
   vp = fp + H2(ic);
 
-  assert(H0(ic) == OP_LABEL);
-  assert(H1(ic) == an);
+  ASSERT(H0(ic) == OP_LABEL);
+  ASSERT(H1(ic) == an);
 
   if (an) {
     // TODO: stack overflow check
@@ -324,10 +324,10 @@ static ExitCode op_nop(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic)
   TAIL return dispatch(ep, ip, fp, vp, sp, 0);
 }
 
-static ExitCode op_ret(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode op_return(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
-  // | RET             | # args | kont   |                 |                 |
+  // | RETURN          | # args | kont   |                 |                 |
   // | arg 0           | arg 1           | arg 2           | arg 3           |
   // |                 |                 |                 |                 |
   // | CALL            | # args | # kont |              dst disp             |
@@ -362,14 +362,14 @@ static ExitCode op_ret(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic)
   sp = fp0;
   ic = PEEK_LE(U64, ip ++);
 
-  assert(
+  ASSERT(
       H0(ic) == OP_CALL
       || H0(ic) == OP_CALL_INDIRECT
       || H0(ic) == OP_CALL_TAIL
       || H0(ic) == OP_CALL_TAIL_INDIRECT
     );
 
-  assert(ki < B3(ic));
+  ASSERT(ki < B3(ic));
 
   S16 di = (S16) H_(PEEK_LE(U64, ip + (B2(ic) + 3) / 4 + ki / 4), ki & 3);
 
@@ -377,8 +377,8 @@ static ExitCode op_ret(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic)
   ic = PEEK_LE(U64, ip ++);
   vp = fp + H2(ic);
 
-  assert(H0(ic) == OP_LABEL);
-  assert(H1(ic) == an);
+  ASSERT(H0(ic) == OP_LABEL);
+  ASSERT(H1(ic) == an);
 
   if (an) {
     while (true) {
@@ -688,9 +688,9 @@ static ExitCode interpret(L64 * ip) {
       [OP_CALL] = op_call,
       [OP_CALL_INDIRECT] = op_call,
       [OP_IF] = op_if,
-      [OP_JUMP] = op_jump,
+      [OP_GOTO] = op_goto,
       [OP_NOP] = op_nop,
-      [OP_RET] = op_ret,
+      [OP_RETURN] = op_return,
       [OP_SHOW_I64] = op_show_i64,
       [OP_CONST_F32] = op_const_f32,
       [OP_CONST_F64] = op_const_f64,
@@ -748,9 +748,9 @@ static ExitCode interpret(L64 * ip) {
 
   U64 ic = PEEK_LE(U64, ip ++);
 
-  assert(H0(ic) == OP_ENTER);
-  assert(B2(ic) == 0);
-  assert(B3(ic) == 1);
+  ASSERT(H0(ic) == OP_ENTER);
+  ASSERT(B2(ic) == 0);
+  ASSERT(B3(ic) == 1);
 
   POKE(U64 *, &stack[0], &stack[0]);
   POKE(L64 *, &stack[1], &stub[0]);
@@ -777,7 +777,7 @@ int main(int, char **) {
     /* 1 */ ic_make_hhh_(OP_LABEL, 1, 1),
     /*   */ ic_make_h___(TY_I64),
     /*   */ ic_make_hh__(OP_SHOW_I64, 1),
-    /*   */ ic_make_hb__(OP_RET, 0, 0),
+    /*   */ ic_make_hb__(OP_RETURN, 0, 0),
     /* 0 */ ic_make_hbh_(OP_ENTER, 1, 1, 10),
     /*   */ ic_make_h___(TY_I64),
     /* 1 */ ic_make_h___(OP_CONST_I64),
@@ -785,12 +785,12 @@ int main(int, char **) {
     /* 2 */ ic_make_hhh_(OP_I64_IS_EQ, 0, 1),
     /*   */ ic_make_hhhh(OP_IF, 2, 1, 4),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 3),
-    /*   */ ic_make_hb__(OP_RET, 1, 0),
+    /*   */ ic_make_hb__(OP_RETURN, 1, 0),
     /*   */ ic_make_h___(1),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 3),
     /* 3 */ ic_make_h___(OP_CONST_I64),
     /*   */ ic_make_d___(1),
-    /*   */ ic_make_hhh_(OP_JUMP, 3, 2),
+    /*   */ ic_make_hhh_(OP_GOTO, 3, 2),
     /*   */ ic_make_hhh_(3, 1, 3),
     /* 4 */ ic_make_hhh_(OP_LABEL, 3, 4),
     /*   */ ic_make_hhh_(TY_I64, TY_I64, TY_I64),
@@ -799,10 +799,10 @@ int main(int, char **) {
     /*   */ ic_make_hhh_(OP_LABEL, 0, 8),
     /* 8 */ ic_make_hhh_(OP_I64_ADD, 5, 6),
     /* 9 */ ic_make_hhh_(OP_I64_ADD, 4, 3),
-    /*   */ ic_make_hhh_(OP_JUMP, 3, (U16) -7),
+    /*   */ ic_make_hhh_(OP_GOTO, 3, (U16) -7),
     /*   */ ic_make_hhh_(9, 6, 8),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 10),
-    /*   */ ic_make_hb__(OP_RET, 1, 0),
+    /*   */ ic_make_hb__(OP_RETURN, 1, 0),
     /*   */ ic_make_h___(6),
   };
 
