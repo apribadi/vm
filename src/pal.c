@@ -31,8 +31,6 @@ typedef ExitCode (* OpHandler)(
 
 typedef struct Env {
   OpHandler dispatch[OP_COUNT];
-  U64 * stack_lo;
-  U64 * stack_hi;
 } Env;
 
 static inline ExitCode dispatch(
@@ -74,19 +72,25 @@ static ExitCode op_abort(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 i
 static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
-  // | CALL            | # args          |              dst disp             |
+  // | OP_CALL         | # args          |              dst disp             |
   // | arg 0           | arg 1           | arg 2           | arg 3           |
   // | arg 4           | arg 5           |                 |                 |
-  // | CONTINUE        | # konts         | frame size      |                 |
+  // | OP_CONTINUE     | # konts         | frame size      |                 |
   // | kont 0          | kont 1          |                 |                 |
   // |                 |                 |                 |                 |
-  // | LABEL           | # args          | next var        |                 |
+  // | OP_CALL_IND...  | # args          | funref          |                 |
+  // | arg 0           | arg 1           | arg 2           | arg 3           |
+  // | arg 4           | arg 5           |                 |                 |
+  // | OP_CONTINUE     | # konts         | frame size      |                 |
+  // | kont 0          | kont 1          |                 |                 |
+  // |                 |                 |                 |                 |
+  // | OP_LABEL        | # args          | next var        |                 |
   // | type 0          | type 1          | type 2          | type 3          |
   // |                 |                 |                 |                 |
-  // | ENTER           | # args          | frame size      | # konts         |
+  // | OP_ENTER        | # args          | frame size      | # konts         |
   // | type 0          | type 1          | type 2          | type 3          |
   // |                 |                 |                 |                 |
-  // | RETURN          | # args          | frame size      | kont index      |
+  // | OP_RETURN       | # args          | frame size      | kont index      |
   // | retval 0        | retval 1        | retval 2        | retval 3        |
   //
   //         sp1 --> +-----+
@@ -106,109 +110,19 @@ static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
   U64 * vp0 = vp;
   U64 * sp0 = sp;
 
-  U16 an = (U16) B2(ic); // # arguments
-  U16 kn = (U16) B3(ic); // # kontinuations
+  U16 an = H1(ic); // # args
+  U16 kn = H1(PEEK_LE(U64, ip + ((size_t) an + 3) / 4)); // # konts
 
   (void) vp0;
-  (void) kn;
+  (void) sp0;
 
   // enter function
 
   switch (H0(ic)) {
     case OP_CALL:
-      ip = ip0 - 1 + (S32) W1(ic);
+      ip = ip - 1 + (S32) W1(ic);
       break;
     case OP_CALL_INDIRECT:
-      ip = PEEK(L64 *, fp0 + H2(ic));
-      break;
-    default:
-      __builtin_unreachable();
-  }
-
-  ic = PEEK_LE(U64, ip ++);
-
-  ASSERT(H0(ic) == OP_ENTER);
-  ASSERT(B2(ic) == an);
-  ASSERT(B3(ic) == kn);
-
-  // make new stack frame
-
-  fp = sp0;
-  vp = sp0;
-  sp = sp0 + H2(ic) + 2;
-
-  // TODO: stack overflow check
-
-  // store frame pointer and return address
-
-  POKE(U64 *, sp0 - 2, fp0);
-  POKE(L64 *, sp0 - 1, ip0 - 1);
-
-  // copy args
-
-  if (an) {
-    while (true) {
-      U64 ic0 = PEEK_LE(U64, ip0 ++);
-      ip ++;
-
-      * vp ++ = fp0[H0(ic0)]; if (! -- an) break;
-      * vp ++ = fp0[H1(ic0)]; if (! -- an) break;
-      * vp ++ = fp0[H2(ic0)]; if (! -- an) break;
-      * vp ++ = fp0[H3(ic0)]; if (! -- an) break;
-   }
-  }
-
-  TAIL return dispatch(ep, ip, fp, vp, sp, 0);
-}
-
-/*
-static ExitCode op_call_tail(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
-  // | H0              | H1              | H2              | H3              |
-  // |                 |                 |                 |                 |
-  // | CALL_TAIL       | # args | # kont |              dst disp             |
-  // | arg 0           | arg 1           | arg 2           | arg 3           |
-  // |                 |                 |                 |                 |
-  // | CALL_TAIL_INDIR | # args | # kont | fun ptr var     |                 |
-  // | arg 0           | arg 1           | arg 2           | arg 3           |
-  // |                 |                 |                 |                 |
-  // | ENTER           | # args | # kont | frame size      |                 |
-  // | param type 0    | param type 1    | param type 2    | param type 3    |
-
-  //                   sp1 --> +-----+
-  //         +-----+           | ooo |
-  //         | arg |           | ooo |
-  //         | arg |           +-----+
-  //         | arg |           |     |
-  // sp0 --> +-----+           |     |
-  //         | ooo |           |     |
-  //         | ooo |           |     |
-  //         +-----+           | arg |
-  //         |     |           | arg |
-  //         |     |           | arg |
-  // fp ---> +-----+   fp ---> +-----+
-  //         | ret |           | ret |
-  //         |     |           |     |
-  //         +-----+           +-----+
-
-  L64 * ip0 = ip;
-  U64 * fp0 = fp;
-  U64 * vp0 = vp;
-  U64 * sp0 = sp;
-
-  U16 an = (U16) B2(ic); // # arguments
-  U16 kn = (U16) B3(ic); // # kontinuations
-
-  (void) fp0;
-  (void) vp0;
-  (void) kn;
-
-  // enter function
-
-  switch (H0(ic)) {
-    case OP_CALL_TAIL:
-      ip = ip0 - 1 + (S32) W1(ic);
-      break;
-    case OP_CALL_TAIL_INDIRECT:
       ip = PEEK(L64 *, fp + H2(ic));
       break;
     default:
@@ -218,14 +132,14 @@ static ExitCode op_call_tail(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U
   ic = PEEK_LE(U64, ip ++);
 
   ASSERT(H0(ic) == OP_ENTER);
-  ASSERT(B2(ic) == an);
-  ASSERT(B3(ic) == kn);
+  ASSERT(H1(ic) == an);
+  ASSERT(H3(ic) == kn);
 
   // make new stack frame
 
-  fp = sp0;
-  vp = sp0;
-  sp = sp0 + H2(ic) + 2;
+  fp = sp;
+  vp = fp;
+  sp = fp + H2(ic) + 1;
 
   // TODO: stack overflow check
 
@@ -240,31 +154,12 @@ static ExitCode op_call_tail(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U
       * vp ++ = fp0[H1(ic0)]; if (! -- an) break;
       * vp ++ = fp0[H2(ic0)]; if (! -- an) break;
       * vp ++ = fp0[H3(ic0)]; if (! -- an) break;
-   }
+    }
   }
 
-  TAIL return dispatch(ep, ip, fp, vp, sp, 0);
-}
-*/
+  // store return address
 
-static ExitCode op_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
-  // | H0              | H1              | H2              | H3              |
-  // |                 |                 |                 |                 |
-  // | IF              | pred            | dst disp 0      | dst disp 0      |
-  // |                 |                 |                 |                 |
-  // | LABEL           | # args (= 0)    | next var        |                 |
-
-  Bool p = PEEK(Bool, fp + H1(ic));
-  S16 a = (S16) H2(ic);
-  S16 b = (S16) H3(ic);
-  S16 di = p ? a : b;
-
-  ip = ip - 1 + di;
-  ic = PEEK_LE(U64, ip ++);
-  vp = fp + H2(ic);
-
-  ASSERT(H0(ic) == OP_LABEL);
-  ASSERT(H1(ic) == 0);
+  POKE(L64 *, fp - 1, ip0);
 
   TAIL return dispatch(ep, ip, fp, vp, sp, 0);
 }
@@ -324,28 +219,47 @@ static ExitCode op_nop(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic)
   TAIL return dispatch(ep, ip, fp, vp, sp, 0);
 }
 
+static ExitCode op_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+  // | H0              | H1              | H2              | H3              |
+  // |                 |                 |                 |                 |
+  // | IF              | pred            | dst disp 0      | dst disp 0      |
+  // |                 |                 |                 |                 |
+  // | LABEL           | # args (= 0)    | next var        |                 |
+
+  Bool p = PEEK(Bool, fp + H1(ic));
+  S16 a = (S16) H2(ic);
+  S16 b = (S16) H3(ic);
+  S16 di = p ? a : b;
+
+  ip = ip - 1 + di;
+  ic = PEEK_LE(U64, ip ++);
+  vp = fp + H2(ic);
+
+  ASSERT(H0(ic) == OP_LABEL);
+  ASSERT(H1(ic) == 0);
+
+  TAIL return dispatch(ep, ip, fp, vp, sp, 0);
+}
+
 static ExitCode op_return(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
-  // | RETURN          | # args | kont   |                 |                 |
-  // | arg 0           | arg 1           | arg 2           | arg 3           |
+  // | RETURN          | # retvals       | frame size      | kont index      |
+  // | retval 0        | retval 1        | retval 2        | retval 3        |
+  //
+  // | CONTINUE        | # konts         | frame size      |                 |
+  // | kont 0          | kont 1          |                 |                 |
   // |                 |                 |                 |                 |
-  // | CALL            | # args | # kont |              dst disp             |
-  // | arg 0           | arg 1           | arg 2           | arg 3           |
-  // | kont disp 0     | kont disp 1     |                 |                 |
-  // |                 |                 |                 |                 |
-  // | LABEL           | # params        | next var        |                 |
-  // | param type 0    | param type 1    | param type 0    | param type 3    |
+  // | LABEL           | # args          | next var        |                 |
+  // | type 0          | type 1          | type 2          | type 3          |
 
   // sp0 ----------> +-----+
-  //                 | ooo |
   //                 | ooo |
   //                 +-----+
   //                 |     |
   //                 |     |
   // fp0 --> sp1 --> +-----+
   //                 | ret |
-  //                 | fp1 |
   //                 +-----+
   //                 |     |
   //                 |     |
@@ -354,24 +268,18 @@ static ExitCode op_return(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 
   L64 * ip0 = ip;
   U64 * fp0 = fp;
 
-  U16 an = (U16) B2(ic);
-  U16 ki = (U16) B3(ic);
+  U16 an = H1(ic);
+  U16 ki = H3(ic);
 
-  fp = PEEK(U64 *, fp0 - 2);
-  ip = PEEK(L64 *, fp0 - 1);
-  sp = fp0;
+  ip = PEEK(L64 *, fp - 1);
   ic = PEEK_LE(U64, ip ++);
+  sp = fp;
+  fp = fp - 1 - H2(ic);
 
-  ASSERT(
-      H0(ic) == OP_CALL
-      || H0(ic) == OP_CALL_INDIRECT
-      || H0(ic) == OP_CALL_TAIL
-      || H0(ic) == OP_CALL_TAIL_INDIRECT
-    );
+  ASSERT(H0(ic) == OP_CONTINUE);
+  ASSERT(ki < H1(ic));
 
-  ASSERT(ki < B3(ic));
-
-  S16 di = (S16) H_(PEEK_LE(U64, ip + (B2(ic) + 3) / 4 + ki / 4), ki & 3);
+  S16 di = (S16) H_(PEEK_LE(U64, ip + ki / 4), ki & 3);
 
   ip = ip - 1 + di;
   ic = PEEK_LE(U64, ip ++);
@@ -687,8 +595,8 @@ static ExitCode interpret(L64 * ip) {
       [OP_ABORT] = op_abort,
       [OP_CALL] = op_call,
       [OP_CALL_INDIRECT] = op_call,
-      [OP_IF] = op_if,
       [OP_GOTO] = op_goto,
+      [OP_IF] = op_if,
       [OP_NOP] = op_nop,
       [OP_RETURN] = op_return,
       [OP_SHOW_I64] = op_show_i64,
@@ -733,12 +641,10 @@ static ExitCode interpret(L64 * ip) {
       [OP_I64_TO_I5] = op_i64_to_i5,
       [OP_I64_TO_I6] = op_i64_to_i6,
     },
-    .stack_lo = &stack[0],
-    .stack_hi = &stack[0] + sizeof(stack) / sizeof(U64),
   };
 
   L64 stub[] = {
-    ic_make_hbw_(OP_CALL, 0, 1, /* dummy */ 0),
+    ic_make_hhh_(OP_CONTINUE, 1, 0),
     ic_make_h___(2),
     ic_make_hhh_(OP_LABEL, 0, 0),
     ic_make_h_w_(OP_ABORT, EXIT_CODE_OK),
@@ -749,43 +655,43 @@ static ExitCode interpret(L64 * ip) {
   U64 ic = PEEK_LE(U64, ip ++);
 
   ASSERT(H0(ic) == OP_ENTER);
-  ASSERT(B2(ic) == 0);
-  ASSERT(B3(ic) == 1);
+  ASSERT(H1(ic) == 0); // # args
+  ASSERT(H3(ic) == 1); // # konts
 
-  POKE(U64 *, &stack[0], &stack[0]);
-  POKE(L64 *, &stack[1], &stub[0]);
+  POKE(L64 *, &stack[0], &stub[0]);
 
   return
     dispatch(
         &env,
         ip,
-        &stack[2],
-        &stack[2],
-        &stack[2 + H2(ic) + 2],
+        &stack[1],
+        &stack[1],
+        &stack[1 + H2(ic) + 1],
         0
     );
 }
 
 int main(int, char **) {
   L64 code[] = {
-    /*   */ ic_make_hbh_(OP_ENTER, 0, 1, 2),
+    /*   */ ic_make_hhhh(OP_ENTER, 0, 2, 1),
     /* 0 */ ic_make_h___(OP_CONST_I64),
     /*   */ ic_make_d___(10),
-    /*   */ ic_make_hbw_(OP_CALL, 1, 1, 7),
+    /*   */ ic_make_hhw_(OP_CALL, 1, 8),
     /*   */ ic_make_h___(0),
-    /*   */ ic_make_h___(3),
+    /*   */ ic_make_hhh_(OP_CONTINUE, 1, 2),
+    /*   */ ic_make_h___(2),
     /* 1 */ ic_make_hhh_(OP_LABEL, 1, 1),
     /*   */ ic_make_h___(TY_I64),
     /*   */ ic_make_hh__(OP_SHOW_I64, 1),
-    /*   */ ic_make_hb__(OP_RETURN, 0, 0),
-    /* 0 */ ic_make_hbh_(OP_ENTER, 1, 1, 10),
+    /*   */ ic_make_hhhh(OP_RETURN, 0, 2, 0),
+    /* 0 */ ic_make_hhhh(OP_ENTER, 1, 10, 1),
     /*   */ ic_make_h___(TY_I64),
     /* 1 */ ic_make_h___(OP_CONST_I64),
     /*   */ ic_make_d___(0),
     /* 2 */ ic_make_hhh_(OP_I64_IS_EQ, 0, 1),
     /*   */ ic_make_hhhh(OP_IF, 2, 1, 4),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 3),
-    /*   */ ic_make_hb__(OP_RETURN, 1, 0),
+    /*   */ ic_make_hhhh(OP_RETURN, 1, 10, 0),
     /*   */ ic_make_h___(1),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 3),
     /* 3 */ ic_make_h___(OP_CONST_I64),
@@ -802,7 +708,7 @@ int main(int, char **) {
     /*   */ ic_make_hhh_(OP_GOTO, 3, (U16) -7),
     /*   */ ic_make_hhh_(9, 6, 8),
     /*   */ ic_make_hhh_(OP_LABEL, 0, 10),
-    /*   */ ic_make_hb__(OP_RETURN, 1, 0),
+    /*   */ ic_make_hhhh(OP_RETURN, 1, 10, 0),
     /*   */ ic_make_h___(6),
   };
 

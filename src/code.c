@@ -142,6 +142,16 @@ static inline L64 ic_make_hhhh(U16 h0, U16 h1, U16 h2, U16 h3) {
   return r;
 }
 
+static inline L64 ic_make_hhw_(U16 h0, U16 h1, U32 w1) {
+  U64 x =
+    (U64) h0
+    | (U64) ((U64) h1 << 16)
+    | (U64) ((U64) w1 << 32);
+  L64 r;
+  POKE_LE(U64, &r, x);
+  return r;
+}
+
 static inline L64 ic_make_hbw_(U16 h0, U8 b2, U8 b3, U32 w1) {
   U64 x =
     (U64) h0
