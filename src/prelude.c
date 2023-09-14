@@ -1,3 +1,5 @@
+#define TAILCALL __attribute__((musttail))
+
 #ifdef NDEBUG
 #define ASSERT(X) do { (void) sizeof((X)); } while (0)
 #else
@@ -91,14 +93,6 @@ static inline U16 H3(U64 x) {
 
 static inline U16 H_(U64 x, int i) {
   return (U16) (x >> 16 * i);
-}
-
-static inline U8 B2(U64 x) {
-  return (U8) (x >> 16);
-}
-
-static inline U8 B3(U64 x) {
-  return (U8) (x >> 24);
 }
 
 static inline int clz64(U64 x) {

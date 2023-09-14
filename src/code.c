@@ -152,17 +152,6 @@ static inline L64 ic_make_hhw_(U16 h0, U16 h1, U32 w1) {
   return r;
 }
 
-static inline L64 ic_make_hbw_(U16 h0, U8 b2, U8 b3, U32 w1) {
-  U64 x =
-    (U64) h0
-    | (U64) ((U64) b2 << 16)
-    | (U64) ((U64) b3 << 24)
-    | (U64) ((U64) w1 << 32);
-  L64 r;
-  POKE_LE(U64, &r, x);
-  return r;
-}
-
 static inline L64 ic_make_d___(U64 x) {
   L64 r;
   POKE_LE(U64, &r, x);
@@ -182,13 +171,5 @@ static inline L64 ic_make_hhh_(U16 h0, U16 h1, U16 h2) {
 }
 
 static inline L64 ic_make_h_w_(U16 h0, U32 w1) {
-  return ic_make_hbw_(h0, 0, 0, w1);
-}
-
-static inline L64 ic_make_hbh_(U16 h0, U8 b2, U8 b3, U16 h2) {
-  return ic_make_hbw_(h0, b2, b3, h2);
-}
-
-static inline L64 ic_make_hb__(U16 h0, U8 b2, U8 b3) {
-  return ic_make_hbw_(h0, b2, b3, 0);
+  return ic_make_hhw_(h0, 0, w1);
 }
