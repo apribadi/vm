@@ -121,6 +121,7 @@ typedef enum TyCode : U16 {
   TY_BOOL,
   TY_F32,
   TY_F64,
+  TY_FUNREF,
   TY_I32,
   TY_I5,
   TY_I6,
