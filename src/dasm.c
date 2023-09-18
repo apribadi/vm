@@ -61,7 +61,7 @@ static void disassemble(L64 * start, L64 * stop) {
         break;
       case OP_ENTER:
         v = 0;
-        printf("enter (");
+        printf("enter #%d (", H3(ic));
         n = H1(ic);
         for (i = 0; i < n; ++ i) {
           k = i & 3;

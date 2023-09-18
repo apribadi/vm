@@ -20,7 +20,9 @@ typedef uint32_t U32;
 typedef uint64_t U64;
 typedef __uint128_t U128;
 
-typedef struct L64 { U64 value; } L64;
+typedef struct L16 { uint16_t value; } L16;
+typedef struct L32 { uint32_t value; } L32;
+typedef struct L64 { uint64_t value; } L64;
 
 static_assert(sizeof(Bool) == 1);
 static_assert(sizeof(F32) == 4);
@@ -35,6 +37,8 @@ static_assert(sizeof(U16) == 2);
 static_assert(sizeof(U32) == 4);
 static_assert(sizeof(U64) == 8);
 static_assert(sizeof(U128) == 16);
+static_assert(sizeof(L16) == 2 && alignof(L16) == 2);
+static_assert(sizeof(L32) == 4 && alignof(L32) == 4);
 static_assert(sizeof(L64) == 8 && alignof(L64) == 8);
 
 #define PEEK(T, P) \
