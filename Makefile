@@ -1,6 +1,6 @@
 .PHONY: all clean default
 
-default: out/exe
+default: out/example
 
 all: pal pal-debug
 
@@ -35,22 +35,10 @@ LDFLAGS = \
 	-arch arm64
 
 clean:
-	rm -f pal pal-debug out/*.o
+	rm -f pal pal-debug out/*.o out/combined
 
-out/exe: out/run.o out/shm.o out/foo.o
-	ld out/run.o out/shm.o out/foo.o -o $@ $(LDFLAGS)
-
-out/run.o: a64/run.c
-	clang -c a64/run.c -o $@ $(CFLAGS) -DNDEBUG
-
-out/shm.o: a64/shm.s
-	as a64/shm.s -o $@
-
-out/foo.o: a64/foo.s
-	as a64/foo.s -o $@
-
-out/bar.o: a64/bar.s
-	as a64/bar.s -o $@
+out/example: a64/runtime.c a64/example.S
+	clang -o out/example a64/runtime.c a64/example.S $(CFLAGS) -DNDEBUG
 
 pal: src/*.c
 	clang -o pal src/pal.c \
