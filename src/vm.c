@@ -17,28 +17,26 @@ typedef ExitCode (* OpHandler)(
 typedef struct Env {
   U64 * bp;
   U64 * lp;
-  U64 * sp;
   OpHandler dispatch[OP_COUNT];
 } Env;
 
-static inline ExitCode dispatch(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp) {
+static inline ExitCode vm_dispatch(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp) {
   U64 ic = PEEK_LE(U64, ip ++);
   return ep->dispatch[H0(ic)](ep, ip, fp, vp, sp, ic);
 }
 
 __attribute__((noinline))
-static ExitCode grow_stack(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_grow_stack(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp) {
   (void) ep;
   (void) ip;
   (void) fp;
   (void) vp;
   (void) sp;
-  (void) ic;
 
   return EXIT_CODE_PANIC;
 }
 
-static ExitCode op_abort(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_abort(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   (void) ep;
   (void) ip;
   (void) fp;
@@ -48,7 +46,7 @@ static ExitCode op_abort(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 i
   return W1(ic);
 }
 
-static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
   // | OP_CALL         | # args          |              dst disp             |
@@ -91,9 +89,6 @@ static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
 
   U16 an = H1(ic); // # args
 
-  (void) vp0;
-  (void) sp0;
-
   // enter function
 
   switch (H0(ic)) {
@@ -113,16 +108,19 @@ static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
   ASSERT(H1(ic) == an);
   ASSERT(H3(ic) == H1(PEEK_LE(U64, ip0 + ((size_t) an + 3) / 4)));
 
+  // stack overflow check
+
+  U32 fz = (U32) H2(ic) + 1;
+
+  if (! (fz <= ep->lp - sp)) {
+    return vm_grow_stack(ep, ip0, fp0, vp0, sp0);
+  }
+
   // make new stack frame
 
   fp = sp;
   vp = fp;
-  sp = fp + H2(ic) + 1;
-
-  // TODO: stack overflow check
-  //
-  // on overflow jump to grow_stack with old instruction pointer and stack
-  // frame, which will then jump back into the dispatch loop.
+  sp = fp + fz;
 
   // copy args
 
@@ -142,10 +140,10 @@ static ExitCode op_call(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
 
   POKE(L64 *, fp - 1, ip0);
 
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_goto(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_goto(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
   // | OP_GOTO         | # args          | dst disp        |                 |
@@ -191,16 +189,16 @@ static ExitCode op_goto(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic
     }
   }
 
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_nop(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_nop(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   (void) ic;
 
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
   // | OP_IF           | pred            | dst disp 0      | dst disp 0      |
@@ -219,10 +217,10 @@ static ExitCode op_if(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) 
   ASSERT(H0(ic) == OP_LABEL);
   ASSERT(H1(ic) == 0);
 
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_return(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_return(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   // | H0              | H1              | H2              | H3              |
   // |                 |                 |                 |                 |
   // | OP_RETURN       | # retvals       | frame size      | kont index      |
@@ -281,348 +279,343 @@ static ExitCode op_return(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 
    }
   }
 
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_select(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_select(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   Bool p = PEEK(Bool, fp + H1(ic));
   U16 i = p ? H2(ic) : H3(ic);
   * vp ++ = fp[i];
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_show_i64(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_show_i64(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   printf("%" PRIi64 "\n", x);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_const_f32(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_const_f32(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U32 x = W1(ic);
   F32 y = PEEK(F32, &x);
   POKE(F32, vp ++, y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_const_f64(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_const_f64(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   (void) ic;
 
   U64 x = PEEK_LE(U64, ip ++);
   F64 y = PEEK(F64, &x);
   POKE(F64, vp ++, y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_const_i32(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_const_i32(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U32 x = W1(ic);
   POKE(U32, vp ++, x);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_const_i64(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_const_i64(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   (void) ic;
 
   U64 x = PEEK_LE(U64, ip ++);
   POKE(U64, vp ++, x);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_f32_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_f32_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   F32 x = PEEK(F32, fp + H1(ic));
   F32 y = PEEK(F32, fp + H2(ic));
   POKE(F32, vp ++, x + y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_f32_sqrt(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_f32_sqrt(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   F32 x = PEEK(F32, fp + H1(ic));
   POKE(F32, vp ++, sqrtf(x));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_f64_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_f64_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   F64 x = PEEK(F64, fp + H1(ic));
   F64 y = PEEK(F64, fp + H2(ic));
   POKE(F64, vp ++, x + y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_f64_sqrt(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_f64_sqrt(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   F64 x = PEEK(F64, fp + H1(ic));
   POKE(F64, vp ++, sqrt(x));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i32_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i32_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U32 x = PEEK(U32, fp + H1(ic));
   U32 y = PEEK(U32, fp + H2(ic));
   POKE(U32, vp ++, x + y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_add(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(U64, vp ++, x + y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_bit_and(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_bit_and(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(U64, vp ++, x & y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_bit_not(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_bit_not(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U64, vp ++, ~ x);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_bit_or(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_bit_or(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(U64, vp ++, x | y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_bit_xor(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_bit_xor(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(U64, vp ++, x ^ y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_clz(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_clz(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U64, vp ++, (U64) clz64(x));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_ctz(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_ctz(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U64, vp ++, (U64) ctz64(x));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_is_eq(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_is_eq(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(Bool, vp ++, x == y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_is_le_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_is_le_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   S64 x = PEEK(S64, fp + H1(ic));
   S64 y = PEEK(S64, fp + H2(ic));
   POKE(Bool, vp ++, x <= y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_is_le_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_is_le_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(Bool, vp ++, x <= y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_is_lt_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_is_lt_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   S64 x = PEEK(S64, fp + H1(ic));
   S64 y = PEEK(S64, fp + H2(ic));
   POKE(Bool, vp ++, x < y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_is_lt_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_is_lt_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(Bool, vp ++, x < y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_mul(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_mul(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(U64, vp ++, x * y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_mul_full_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_mul_full_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   S128 x = (S128) PEEK(S64, fp + H1(ic));
   S128 y = (S128) PEEK(S64, fp + H2(ic));
   S128 z = x * y;
   POKE(U64, vp ++, (U64) (U128) z);
   POKE(U64, vp ++, (U64) ((U128) z >> 64));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_mul_full_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_mul_full_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U128 x = (U128) PEEK(U64, fp + H1(ic));
   U128 y = (U128) PEEK(U64, fp + H2(ic));
   U128 z = x * y;
   POKE(U64, vp ++, (U64) z);
   POKE(U64, vp ++, (U64) (z >> 64));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_mul_hi_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_mul_hi_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   S128 x = (S128) PEEK(S64, fp + H1(ic));
   S128 y = (S128) PEEK(S64, fp + H2(ic));
   S128 z = x * y;
   POKE(U64, vp ++, (U64) ((U128) z >> 64));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_mul_hi_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_mul_hi_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U128 x = (U128) PEEK(U64, fp + H1(ic));
   U128 y = (U128) PEEK(U64, fp + H2(ic));
   U128 z = x * y;
   POKE(U64, vp ++, (U64) (z >> 64));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_neg(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_neg(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U64, vp ++, - x);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_rev(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_rev(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U64, vp ++, rev64(x));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_rol(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_rol(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic));
   POKE(U64, vp ++, rol64(x, y));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_ror(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_ror(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic));
   POKE(U64, vp ++, ror64(x, y));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_shl(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_shl(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic));
   POKE(U64, vp ++, shl64(x, y));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_shr_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_shr_s(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   S64 x = PEEK(S64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic));
   POKE(S64, vp ++, asr64(x, y));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_shr_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_shr_u(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U8 y = PEEK(U8, fp + H2(ic));
   POKE(U64, vp ++, lsr64(x, y));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_sub(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_sub(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   U64 y = PEEK(U64, fp + H2(ic));
   POKE(U64, vp ++, x - y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_to_f64_bitcast(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_to_f64_bitcast(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   F64 y = PEEK(F64, &x);
   POKE(F64, vp ++, y);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_to_i32(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_to_i32(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U32, vp ++, (U32) x);
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_to_i32_hi(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_to_i32_hi(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U32, vp ++, (U32) (x >> 32));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_to_i5(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_to_i5(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U8, vp ++, (U8) (x & 0x1f));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
-static ExitCode op_i64_to_i6(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
+static ExitCode vm_i64_to_i6(Env * ep, L64 * ip, U64 * fp, U64 * vp, U64 * sp, U64 ic) {
   U64 x = PEEK(U64, fp + H1(ic));
   POKE(U8, vp ++, (U8) (x & 0x3f));
-  return dispatch(ep, ip, fp, vp, sp);
+  return vm_dispatch(ep, ip, fp, vp, sp);
 }
 
 static ExitCode interpret(L64 * ip) {
-  U64 stack[256] = { 0 };
-
   Env env = {
-    .bp = nullptr,
-    .lp = nullptr,
-    .sp = nullptr,
     .dispatch = {
-      [OP_ABORT] = op_abort,
-      [OP_CALL] = op_call,
-      [OP_CALL_INDIRECT] = op_call,
-      [OP_GOTO] = op_goto,
-      [OP_IF] = op_if,
-      [OP_NOP] = op_nop,
-      [OP_RETURN] = op_return,
-      [OP_SELECT] = op_select,
-      [OP_SHOW_I64] = op_show_i64,
-      [OP_CONST_F32] = op_const_f32,
-      [OP_CONST_F64] = op_const_f64,
-      [OP_CONST_I32] = op_const_i32,
-      [OP_CONST_I64] = op_const_i64,
-      [OP_F32_ADD] = op_f32_add,
-      [OP_F32_SQRT] = op_f32_sqrt,
-      [OP_F64_ADD] = op_f64_add,
-      [OP_F64_SQRT] = op_f64_sqrt,
-      [OP_I32_ADD] = op_i32_add,
-      [OP_I64_ADD] = op_i64_add,
-      [OP_I64_BIT_AND] = op_i64_bit_and,
-      [OP_I64_BIT_NOT] = op_i64_bit_not,
-      [OP_I64_BIT_OR] = op_i64_bit_or,
-      [OP_I64_BIT_XOR] = op_i64_bit_xor,
-      [OP_I64_CLZ] = op_i64_clz,
-      [OP_I64_CTZ] = op_i64_ctz,
-      [OP_I64_IS_EQ] = op_i64_is_eq,
-      [OP_I64_IS_LE_S] = op_i64_is_le_s,
-      [OP_I64_IS_LE_U] = op_i64_is_le_u,
-      [OP_I64_IS_LT_S] = op_i64_is_lt_s,
-      [OP_I64_IS_LT_U] = op_i64_is_lt_u,
-      [OP_I64_MUL] = op_i64_mul,
-      [OP_I64_MUL_FULL_S] = op_i64_mul_full_s,
-      [OP_I64_MUL_FULL_U] = op_i64_mul_full_u,
-      [OP_I64_MUL_HI_S] = op_i64_mul_hi_s,
-      [OP_I64_MUL_HI_U] = op_i64_mul_hi_u,
-      [OP_I64_NEG] = op_i64_neg,
-      [OP_I64_REV] = op_i64_rev,
-      [OP_I64_ROL] = op_i64_rol,
-      [OP_I64_ROR] = op_i64_ror,
-      [OP_I64_SHL] = op_i64_shl,
-      [OP_I64_SHR_S] = op_i64_shr_s,
-      [OP_I64_SHR_U] = op_i64_shr_u,
-      [OP_I64_SUB] = op_i64_sub,
-      [OP_I64_TO_F64_BITCAST] = op_i64_to_f64_bitcast,
-      [OP_I64_TO_I32] = op_i64_to_i32,
-      [OP_I64_TO_I32_HI] = op_i64_to_i32_hi,
-      [OP_I64_TO_I5] = op_i64_to_i5,
-      [OP_I64_TO_I6] = op_i64_to_i6,
+      [OP_ABORT] = vm_abort,
+      [OP_CALL] = vm_call,
+      [OP_CALL_INDIRECT] = vm_call,
+      [OP_GOTO] = vm_goto,
+      [OP_IF] = vm_if,
+      [OP_NOP] = vm_nop,
+      [OP_RETURN] = vm_return,
+      [OP_SELECT] = vm_select,
+      [OP_SHOW_I64] = vm_show_i64,
+      [OP_CONST_F32] = vm_const_f32,
+      [OP_CONST_F64] = vm_const_f64,
+      [OP_CONST_I32] = vm_const_i32,
+      [OP_CONST_I64] = vm_const_i64,
+      [OP_F32_ADD] = vm_f32_add,
+      [OP_F32_SQRT] = vm_f32_sqrt,
+      [OP_F64_ADD] = vm_f64_add,
+      [OP_F64_SQRT] = vm_f64_sqrt,
+      [OP_I32_ADD] = vm_i32_add,
+      [OP_I64_ADD] = vm_i64_add,
+      [OP_I64_BIT_AND] = vm_i64_bit_and,
+      [OP_I64_BIT_NOT] = vm_i64_bit_not,
+      [OP_I64_BIT_OR] = vm_i64_bit_or,
+      [OP_I64_BIT_XOR] = vm_i64_bit_xor,
+      [OP_I64_CLZ] = vm_i64_clz,
+      [OP_I64_CTZ] = vm_i64_ctz,
+      [OP_I64_IS_EQ] = vm_i64_is_eq,
+      [OP_I64_IS_LE_S] = vm_i64_is_le_s,
+      [OP_I64_IS_LE_U] = vm_i64_is_le_u,
+      [OP_I64_IS_LT_S] = vm_i64_is_lt_s,
+      [OP_I64_IS_LT_U] = vm_i64_is_lt_u,
+      [OP_I64_MUL] = vm_i64_mul,
+      [OP_I64_MUL_FULL_S] = vm_i64_mul_full_s,
+      [OP_I64_MUL_FULL_U] = vm_i64_mul_full_u,
+      [OP_I64_MUL_HI_S] = vm_i64_mul_hi_s,
+      [OP_I64_MUL_HI_U] = vm_i64_mul_hi_u,
+      [OP_I64_NEG] = vm_i64_neg,
+      [OP_I64_REV] = vm_i64_rev,
+      [OP_I64_ROL] = vm_i64_rol,
+      [OP_I64_ROR] = vm_i64_ror,
+      [OP_I64_SHL] = vm_i64_shl,
+      [OP_I64_SHR_S] = vm_i64_shr_s,
+      [OP_I64_SHR_U] = vm_i64_shr_u,
+      [OP_I64_SUB] = vm_i64_sub,
+      [OP_I64_TO_F64_BITCAST] = vm_i64_to_f64_bitcast,
+      [OP_I64_TO_I32] = vm_i64_to_i32,
+      [OP_I64_TO_I32_HI] = vm_i64_to_i32_hi,
+      [OP_I64_TO_I5] = vm_i64_to_i5,
+      [OP_I64_TO_I6] = vm_i64_to_i6,
     },
   };
 
@@ -633,26 +626,35 @@ static ExitCode interpret(L64 * ip) {
     ic_make_h_w_(OP_ABORT, EXIT_CODE_OK),
   };
 
-  (void) &grow_stack;
-
   U64 ic = PEEK_LE(U64, ip ++);
 
   ASSERT(H0(ic) == OP_ENTER);
   ASSERT(H1(ic) == 0); // # args
   ASSERT(H3(ic) == 1); // # konts
 
+  const size_t INIT_STACK_SIZE = 256;
+
+  U64 * stack = malloc(sizeof(U64) * INIT_STACK_SIZE);
+
+  if (! stack) {
+    return EXIT_CODE_PANIC;
+  }
+
   POKE(L64 *, &stack[0], &stub[0]);
 
-  env.bp = &stack[0];
-  env.lp = &stack[0] + sizeof(stack) / sizeof(U64);
-  env.sp = &stack[0] + 1 + H2(ic) + 1;
+  env.bp = stack;
+  env.lp = stack + INIT_STACK_SIZE;
 
-  return
-    dispatch(
+  ExitCode ec =
+    vm_dispatch(
         &env,
         ip,
-        &stack[1],
-        &stack[1],
-        &stack[1 + H2(ic) + 1]
+        stack + 1,
+        stack + 1,
+        stack + 1 + H2(ic) + 1
     );
+
+  free(env.bp);
+
+  return ec;
 }
