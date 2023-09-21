@@ -5,6 +5,7 @@
 #include <stdnoreturn.h>
 
 struct Env {
+  void * v_stack;
   void * c_stack;
 };
 
@@ -14,13 +15,12 @@ struct Stk {
 
 extern unsigned char v_main;
 
-noreturn void v_exec_0(void * ep, void * lp, void * sp, void * fn);
+noreturn void v_exec_0(void * ep, void * sp, void * fn);
 
-noreturn void v_kont_0(void * ep, void * lp, void * sp);
+noreturn void v_kont_0(void * ep, void * sp);
 
-noreturn void c_prim_exit(void * ep, void * lp, void * sp) {
+noreturn void c_prim_exit(void * ep, void * sp) {
   (void) ep;
-  (void) lp;
   (void) sp;
 
   // TODO: free stack
@@ -28,20 +28,19 @@ noreturn void c_prim_exit(void * ep, void * lp, void * sp) {
   exit(0);
 }
 
-noreturn void c_prim_show(void * ep, void * lp, void * sp, uint64_t x0) {
+noreturn void c_prim_show(void * ep, void * sp, uint64_t x0) {
   printf("%" PRId64 "\n", x0);
 
-  v_kont_0(ep, lp, sp);
+  v_kont_0(ep, sp);
 }
 
-noreturn void c_prim_hello(void * ep, void * lp, void * sp) {
+noreturn void c_prim_hello(void * ep, void * sp) {
   (void) ep;
-  (void) lp;
   (void) sp;
 
   printf("Hello!\n");
 
-  v_kont_0(ep, lp, sp);
+  v_kont_0(ep, sp);
 }
 
 noreturn void init(void) {
@@ -50,8 +49,10 @@ noreturn void init(void) {
   void * ep = &e;
   void * lp = &s.data[0];
   void * sp = &s.data[256];
+  e.v_stack = lp;
+  e.c_stack = nullptr;
 
-  v_exec_0(ep, lp, sp, &v_main);
+  v_exec_0(ep, sp, &v_main);
 }
 
 int main(int, char **) {
